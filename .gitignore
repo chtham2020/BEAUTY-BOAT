@@ -1,0 +1,13 @@
+.next
+node_modules
+out
+dist
+*.log
+.env*
+prisma/*.db
+prisma/*.db-journal
+coverage
+*.tsbuildinfo
+.vercel
+.DS_Store
+Thumbs.db
