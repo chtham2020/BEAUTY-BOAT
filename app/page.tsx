@@ -1,9 +1,8 @@
 "use client";
 
+import { useLanguagePreference } from "@/lib/language";
 import { ChevronLeft, ChevronRight, MapPin, Phone, ReceiptText } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-
-type Language = "zh" | "en";
 
 const brand = "美人舟";
 const company = {
@@ -26,8 +25,11 @@ const business = {
 const copy = {
   zh: {
     nav: {
+      home: "主页",
       story: "品牌故事",
       products: "香料粉",
+      order: "订购",
+      cart: "购物车",
       contact: "联系",
     },
     heroKicker: "福安传统香料",
@@ -77,6 +79,7 @@ const copy = {
     customTitle: "需要自己的粉料比例？",
     customBody:
       "告诉我们用途、口味方向和使用场景，福安可以协助讨论适合的粉料组合。",
+    orderCta: "前往订购",
     contactTitle: "联系与付款",
     addressLabel: "地址",
     phoneLabel: "电话",
@@ -86,8 +89,11 @@ const copy = {
   },
   en: {
     nav: {
+      home: "Home",
       story: "Story",
       products: "Powders",
+      order: "Order",
+      cart: "Shopping Cart",
       contact: "Contact",
     },
     heroKicker: "Traditional spices by FOOK ON",
@@ -137,6 +143,7 @@ const copy = {
     customTitle: "Need your own powder ratio?",
     customBody:
       "Share the dish, flavour direction, and usage context. FOOK ON can help discuss a suitable blend.",
+    orderCta: "Order",
     contactTitle: "Contact & Payment",
     addressLabel: "Address",
     phoneLabel: "Phone",
@@ -153,7 +160,7 @@ const images = [
 ];
 
 export default function Home() {
-  const [language, setLanguage] = useState<Language>("zh");
+  const { language, setLanguage } = useLanguagePreference();
   const [activeSlide, setActiveSlide] = useState(0);
   const t = copy[language];
   const otherLanguage = language === "zh" ? "en" : "zh";
@@ -178,7 +185,7 @@ export default function Home() {
   return (
     <main className="site-shell">
       <a className="floating-cart" href="/cart" aria-label="Open cart">
-        购物车
+        {t.nav.cart}
       </a>
       <header className="topbar" aria-label="Primary navigation">
         <a className="wordmark" href="#top" aria-label={`${brand} ${company[language]}`}>
@@ -186,10 +193,11 @@ export default function Home() {
           <small>{company[language]}</small>
         </a>
         <nav className="nav-links">
+          <a href="/">{t.nav.home}</a>
           <a href="#story">{t.nav.story}</a>
           <a href="#products">{t.nav.products}</a>
-          <a href="/products">订购</a>
-          <a href="/cart">购物车</a>
+          <a href="/products">{t.nav.order}</a>
+          <a href="/cart">{t.nav.cart}</a>
           <a href="#contact">{t.nav.contact}</a>
         </nav>
         <button
@@ -304,7 +312,7 @@ export default function Home() {
           {business.phoneDisplay}
         </a>
         <a className="primary-link dark" href="/products">
-          前往订购
+          {t.orderCta}
         </a>
       </section>
 

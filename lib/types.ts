@@ -12,15 +12,31 @@ export type PublicProduct = {
   active: boolean;
 };
 
+export type CustomQuoteSnapshot = {
+  vendorCode: string;
+  vendorName: string;
+  blendType: string;
+  ingredients: string[];
+  ingredientQuantity: string;
+  unit: string;
+  heatTreatment: string;
+  processSpec: string;
+  grindingCostPer600gCents: number;
+  minimumQuantityKg: number;
+  unitPriceCents: number;
+};
+
 export type CartItem = {
   productId: string;
   quantity: number;
+  customQuote?: CustomQuoteSnapshot;
   product: PublicProduct;
 };
 
 export type CartStoredItem = {
   productId: string;
   quantity: number;
+  customQuote?: CustomQuoteSnapshot;
 };
 
 export const DELIVERY_METHODS = [

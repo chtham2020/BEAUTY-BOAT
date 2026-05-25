@@ -55,6 +55,17 @@ model OrderItem {
   unitPriceCents Int?
   lineTotalCents Int?
   quoteOnly      Boolean  @default(false)
+  vendorCode     String?
+  vendorName     String?
+  blendType      String?
+  ingredients    String?
+  ingredientQuantity String?
+  heatTreatment  String?
+  processSpec    String?
+  grindingCostPer600gCents Int?
+  minimumQuantityKg Int?
+  depositCents   Int?
+  balanceCents   Int?
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product        Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 }

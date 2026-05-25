@@ -2,14 +2,73 @@
 
 import { calculateGst, formatMoney } from "@/lib/money";
 import type { CartItem, CartStoredItem, PublicProduct } from "@/lib/types";
+import { useLanguagePreference } from "@/lib/language";
+import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, customCartKey } from "@/lib/custom-pricing";
+import { House } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
 const CART_KEY = "beauty_boat_cart";
 
+const copy = {
+  zh: {
+    eyebrow: "Cart",
+    title: "购物车",
+    body: "运输费另计；Lalamove/Grab 费用或自费领取安排会由店家确认。",
+    home: "主页",
+    continueShopping: "继续选购",
+    empty: "购物车目前是空的。",
+    quote: "询价",
+    remove: "删除",
+    summary: "金额摘要",
+    subtotal: "商品小计",
+    deliveryFee: "运输费",
+    separate: "另计",
+    estimatedTotal: "预计合计",
+    finalPending: "最终金额待确认",
+    vendorCode: "Vendor code",
+    ingredients: "Ingredients",
+    heatTreatment: "Heat treatment",
+    processSpec: "Baking / grinding spec",
+    minimumQuantity: "Minimum quantity",
+    grindingCost: "Grinding cost",
+    deposit: "70% deposit",
+    balance: "30% upon collection",
+    customSubtotal: "Custom Blend subtotal",
+    checkout: "前往结账",
+  },
+  en: {
+    eyebrow: "Cart",
+    title: "Shopping Cart",
+    body: "Delivery fee is quoted separately. Lalamove/Grab delivery or self-pickup arrangements will be confirmed by the shop.",
+    home: "Home",
+    continueShopping: "Continue Shopping",
+    empty: "Your shopping cart is empty.",
+    quote: "Quote",
+    remove: "Remove",
+    summary: "Amount Summary",
+    subtotal: "Subtotal",
+    deliveryFee: "Delivery Fee",
+    separate: "Separate quote",
+    estimatedTotal: "Estimated Total",
+    finalPending: "Final amount pending",
+    vendorCode: "Vendor Code",
+    ingredients: "Ingredients",
+    heatTreatment: "Heat Treatment",
+    processSpec: "Baking / Grinding Spec",
+    minimumQuantity: "Minimum Quantity",
+    grindingCost: "Grinding Cost",
+    deposit: "70% Deposit",
+    balance: "30% Upon Collection",
+    customSubtotal: "Custom Blend Subtotal",
+    checkout: "Checkout",
+  },
+};
+
 function readCart(): CartStoredItem[] {
   try {
-    return JSON.parse(window.localStorage.getItem(CART_KEY) || "[]");
+    const items = JSON.parse(window.localStorage.getItem(CART_KEY) || "[]") as CartStoredItem[];
+    return items.filter((item) => item.productId !== CUSTOM_BLEND_PRODUCT_ID || item.customQuote);
   } catch {
     return [];
   }
@@ -20,47 +79,64 @@ function saveCart(items: CartStoredItem[]) {
 }
 
 export default function CartPage() {
+  const { language } = useLanguagePreference();
   const [items, setItems] = useState<CartItem[]>([]);
+  const t = copy[language];
 
   useEffect(() => {
     async function load() {
       const stored = readCart();
       const products: PublicProduct[] = await fetch("/api/products").then((res) => res.json());
-      setItems(
+      const nextItems =
         stored
           .map((item) => {
             const product = products.find((entry) => entry.id === item.productId);
             return product ? { ...item, product } : null;
           })
-          .filter(Boolean) as CartItem[],
-      );
+          .filter(Boolean) as CartItem[];
+      setItems(nextItems);
+      saveCart(nextItems.map(({ productId, quantity, customQuote }) => ({ productId, quantity, customQuote })));
     }
     load();
   }, []);
 
-  function updateQuantity(productId: string, quantity: number) {
+  function updateQuantity(itemKey: string, quantity: number) {
+    const current = items.find((item) => customCartKey(item.productId, item.customQuote?.vendorCode) === itemKey);
+    const minimum = current?.customQuote?.minimumQuantityKg ?? 1;
     const next = items
-      .map((item) => (item.productId === productId ? { ...item, quantity: Math.max(1, quantity) } : item))
+      .map((item) =>
+        customCartKey(item.productId, item.customQuote?.vendorCode) === itemKey
+          ? { ...item, quantity: Math.max(minimum, quantity) }
+          : item,
+      )
       .filter((item) => item.quantity > 0);
     setItems(next);
-    saveCart(next.map(({ productId, quantity }) => ({ productId, quantity })));
+    saveCart(next.map(({ productId, quantity, customQuote }) => ({ productId, quantity, customQuote })));
   }
 
-  function remove(productId: string) {
-    const next = items.filter((item) => item.productId !== productId);
+  function remove(itemKey: string) {
+    const next = items.filter((item) => customCartKey(item.productId, item.customQuote?.vendorCode) !== itemKey);
     setItems(next);
-    saveCart(next.map(({ productId, quantity }) => ({ productId, quantity })));
+    saveCart(next.map(({ productId, quantity, customQuote }) => ({ productId, quantity, customQuote })));
   }
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => {
+      if (item.customQuote) return sum + calculateCustomLineTotalCents(item.quantity, item.customQuote);
       if (item.product.quoteOnly || item.product.priceCents == null) return sum;
       return sum + item.product.priceCents * item.quantity;
+    }, 0);
+    const customSubtotal = items.reduce((sum, item) => {
+      if (!item.customQuote) return sum;
+      return sum + calculateCustomLineTotalCents(item.quantity, item.customQuote);
     }, 0);
     return {
       subtotal,
       gst: calculateGst(subtotal),
-      hasQuote: items.some((item) => item.product.quoteOnly || item.product.priceCents == null),
+      customSubtotal,
+      deposit: calculateDepositCents(customSubtotal),
+      balance: calculateBalanceCents(customSubtotal),
+      hasQuote: items.some((item) => !item.customQuote && (item.product.quoteOnly || item.product.priceCents == null)),
     };
   }, [items]);
 
@@ -69,44 +145,73 @@ export default function CartPage() {
       <header className="shop-header">
         <div>
           <p className="eyebrow">Cart</p>
-          <h1>购物车</h1>
-          <p>运输费另计；Lalamove/Grab 费用或自费领取安排会由店家确认。</p>
+          <h1>{t.title}</h1>
+          <p>{t.body}</p>
         </div>
-        <Link className="cart-link" href="/products">
-          继续选购
-        </Link>
+        <div className="shop-actions">
+          <Link className="cart-link" href="/">
+            <House size={18} />
+            {t.home}
+          </Link>
+          <Link className="cart-link" href="/products">
+            {t.continueShopping}
+          </Link>
+        </div>
       </header>
 
       <section className="cart-layout">
         <div className="cart-lines">
-          {items.length === 0 && <p>购物车目前是空的。</p>}
+          {items.length === 0 && <p>{t.empty}</p>}
           {items.map((item) => (
-            <article className="cart-line" key={item.productId}>
+            <article className="cart-line" key={customCartKey(item.productId, item.customQuote?.vendorCode)}>
               <div>
-                <h2>{item.product.nameZh}</h2>
-                <p>{item.product.nameEn} · {item.product.unit}</p>
-                <strong>{item.product.quoteOnly ? "询价" : formatMoney(item.product.priceCents)}</strong>
+                <h2>{language === "en" ? item.product.nameEn : item.product.nameZh}</h2>
+                <p>{language === "en" ? item.product.nameZh : item.product.nameEn} · {item.product.unit}</p>
+                <strong>
+                  {item.customQuote
+                    ? formatMoney(calculateCustomLineTotalCents(item.quantity, item.customQuote))
+                    : item.product.quoteOnly ? t.quote : formatMoney(item.product.priceCents)}
+                </strong>
+                {item.customQuote && (
+                  <div className="custom-cart-details">
+                    <p><span>{t.vendorCode}</span><b>{item.customQuote.vendorCode} · {item.customQuote.vendorName}</b></p>
+                    <p><span>{t.ingredients}</span><b>{item.customQuote.ingredients.join(", ")}</b></p>
+                    <p><span>{t.heatTreatment}</span><b>{item.customQuote.heatTreatment}</b></p>
+                    <p><span>{t.processSpec}</span><b>{item.customQuote.processSpec}</b></p>
+                    <p><span>{t.minimumQuantity}</span><b>{item.customQuote.minimumQuantityKg}kg</b></p>
+                    <p><span>{t.grindingCost}</span><b>{formatMoney(item.customQuote.grindingCostPer600gCents)} / 600g</b></p>
+                  </div>
+                )}
               </div>
               <input
                 type="number"
-                min="1"
+                min={item.customQuote?.minimumQuantityKg ?? 1}
                 value={item.quantity}
-                onChange={(event) => updateQuantity(item.productId, Number(event.target.value))}
+                onChange={(event) =>
+                  updateQuantity(customCartKey(item.productId, item.customQuote?.vendorCode), Number(event.target.value))
+                }
               />
-              <button type="button" onClick={() => remove(item.productId)}>
-                删除
+              <button type="button" onClick={() => remove(customCartKey(item.productId, item.customQuote?.vendorCode))}>
+                {t.remove}
               </button>
             </article>
           ))}
         </div>
         <aside className="summary-box">
-          <h2>金额摘要</h2>
-          <p><span>商品小计</span><strong>{formatMoney(totals.subtotal)}</strong></p>
+          <h2>{t.summary}</h2>
+          <p><span>{t.subtotal}</span><strong>{formatMoney(totals.subtotal)}</strong></p>
           <p><span>GST 9%</span><strong>{formatMoney(totals.gst)}</strong></p>
-          <p><span>运输费</span><strong>另计</strong></p>
-          <p><span>预计合计</span><strong>{totals.hasQuote ? "最终金额待确认" : formatMoney(totals.subtotal + totals.gst)}</strong></p>
+          {totals.customSubtotal > 0 && (
+            <>
+              <p><span>{t.customSubtotal}</span><strong>{formatMoney(totals.customSubtotal)}</strong></p>
+              <p><span>{t.deposit}</span><strong>{formatMoney(totals.deposit)}</strong></p>
+              <p><span>{t.balance}</span><strong>{formatMoney(totals.balance)}</strong></p>
+            </>
+          )}
+          <p><span>{t.deliveryFee}</span><strong>{t.separate}</strong></p>
+          <p><span>{t.estimatedTotal}</span><strong>{totals.hasQuote ? t.finalPending : formatMoney(totals.subtotal + totals.gst)}</strong></p>
           <Link className="checkout-button" href="/checkout" aria-disabled={items.length === 0}>
-            前往结账
+            {t.checkout}
           </Link>
         </aside>
       </section>

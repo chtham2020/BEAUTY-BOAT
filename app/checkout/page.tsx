@@ -1,30 +1,104 @@
 "use client";
 
 import { DELIVERY_METHODS, type CartStoredItem } from "@/lib/types";
+import { useLanguagePreference } from "@/lib/language";
+import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents } from "@/lib/custom-pricing";
+import { formatMoney } from "@/lib/money";
+import { House } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const CART_KEY = "beauty_boat_cart";
 
+const copy = {
+  zh: {
+    title: "提交订单",
+    body: "店家会通过 WhatsApp text 或电话跟进最终报价、运输费和 PayNow 付款。",
+    home: "主页",
+    emptyCart: "购物车是空的。",
+    submitFailed: "订单提交失败，请检查资料或稍后再试。",
+    name: "姓名",
+    phone: "电话 / WhatsApp",
+    deliveryMethod: "运输方式",
+    deliveryNote: "取货/配送备注",
+    deliveryPlaceholder: "例如：希望下午送达，或预约自取时间",
+    orderNote: "订单备注",
+    orderPlaceholder: "例如：客制粉料用途、口味方向、数量需求",
+    deliveryFee: "运输费",
+    deliveryFeeValue: "Lalamove/Grab 另计，自费领取可为 0",
+    payment: "付款",
+    paymentValue: "店家确认后 PayNow",
+    customSubtotal: "Custom Blend subtotal",
+    deposit: "70% deposit",
+    balance: "30% upon collection",
+    submitting: "提交中...",
+    submit: "提交订单",
+  },
+  en: {
+    title: "Submit Order",
+    body: "The shop will follow up by WhatsApp text or phone to confirm the final quote, delivery fee, and PayNow payment.",
+    home: "Home",
+    emptyCart: "Shopping Cart is empty.",
+    submitFailed: "Order submission failed. Please check your details or try again later.",
+    name: "Name",
+    phone: "Phone / WhatsApp",
+    deliveryMethod: "Delivery Method",
+    deliveryNote: "Pickup / Delivery Note",
+    deliveryPlaceholder: "Example: afternoon delivery preferred, or self-pickup appointment time",
+    orderNote: "Order Note",
+    orderPlaceholder: "Example: custom blend use, flavour direction, quantity needed",
+    deliveryFee: "Delivery Fee",
+    deliveryFeeValue: "Lalamove/Grab quoted separately. Self pickup can be 0.",
+    payment: "Payment",
+    paymentValue: "PayNow after shop confirmation",
+    customSubtotal: "Custom Blend Subtotal",
+    deposit: "70% Deposit",
+    balance: "30% Upon Collection",
+    submitting: "Submitting...",
+    submit: "Submit Order",
+  },
+};
+
 function readCart(): CartStoredItem[] {
   try {
-    return JSON.parse(window.localStorage.getItem(CART_KEY) || "[]");
+    const items = JSON.parse(window.localStorage.getItem(CART_KEY) || "[]") as CartStoredItem[];
+    return items.filter((item) => item.productId !== CUSTOM_BLEND_PRODUCT_ID || item.customQuote);
   } catch {
     return [];
   }
 }
 
 export default function CheckoutPage() {
+  const { language } = useLanguagePreference();
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [cartItems, setCartItems] = useState<CartStoredItem[]>([]);
+  const t = copy[language];
+
+  useEffect(() => {
+    setCartItems(readCart());
+  }, []);
+
+  const customTotals = useMemo(() => {
+    const customSubtotal = cartItems.reduce((sum, item) => {
+      if (!item.customQuote) return sum;
+      return sum + calculateCustomLineTotalCents(item.quantity, item.customQuote);
+    }, 0);
+    return {
+      customSubtotal,
+      deposit: calculateDepositCents(customSubtotal),
+      balance: calculateBalanceCents(customSubtotal),
+    };
+  }, [cartItems]);
 
   async function submit(formData: FormData) {
     setError("");
     setLoading(true);
     const items = readCart();
     if (items.length === 0) {
-      setError("购物车是空的。");
+      setError(t.emptyCart);
       setLoading(false);
       return;
     }
@@ -44,7 +118,7 @@ export default function CheckoutPage() {
 
     setLoading(false);
     if (!response.ok) {
-      setError("订单提交失败，请检查资料或稍后再试。");
+      setError(t.submitFailed);
       return;
     }
 
@@ -58,46 +132,57 @@ export default function CheckoutPage() {
       <header className="shop-header">
         <div>
           <p className="eyebrow">Checkout</p>
-          <h1>提交订单</h1>
-          <p>店家会通过 WhatsApp text 或电话跟进最终报价、运输费和 PayNow 付款。</p>
+          <h1>{t.title}</h1>
+          <p>{t.body}</p>
         </div>
+        <Link className="cart-link" href="/">
+          <House size={18} />
+          {t.home}
+        </Link>
       </header>
 
       <form className="checkout-form" action={submit}>
         <label>
-          姓名
+          {t.name}
           <input name="customerName" required />
         </label>
         <label>
-          电话 / WhatsApp
+          {t.phone}
           <input name="customerPhone" required />
         </label>
         <label>
-          运输方式
+          {t.deliveryMethod}
           <select name="deliveryMethod" required defaultValue="third-party">
             {DELIVERY_METHODS.map((method) => (
               <option key={method.value} value={method.value}>
-                {method.zh} / {method.en}
+                {language === "en" ? method.en : `${method.zh} / ${method.en}`}
               </option>
             ))}
           </select>
         </label>
         <label>
-          取货/配送备注
-          <textarea name="deliveryNote" rows={3} placeholder="例如：希望下午送达，或预约自取时间" />
+          {t.deliveryNote}
+          <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} />
         </label>
         <label>
-          订单备注
-          <textarea name="customerNote" rows={4} placeholder="例如：客制粉料用途、口味方向、数量需求" />
+          {t.orderNote}
+          <textarea name="customerNote" rows={4} placeholder={t.orderPlaceholder} />
         </label>
         <div className="summary-box">
           <p><span>GST</span><strong>9%</strong></p>
-          <p><span>运输费</span><strong>Lalamove/Grab 另计，自费领取可为 0</strong></p>
-          <p><span>付款</span><strong>店家确认后 PayNow</strong></p>
+          {customTotals.customSubtotal > 0 && (
+            <>
+              <p><span>{t.customSubtotal}</span><strong>{formatMoney(customTotals.customSubtotal)}</strong></p>
+              <p><span>{t.deposit}</span><strong>{formatMoney(customTotals.deposit)}</strong></p>
+              <p><span>{t.balance}</span><strong>{formatMoney(customTotals.balance)}</strong></p>
+            </>
+          )}
+          <p><span>{t.deliveryFee}</span><strong>{t.deliveryFeeValue}</strong></p>
+          <p><span>{t.payment}</span><strong>{t.paymentValue}</strong></p>
         </div>
         {error && <p className="form-error">{error}</p>}
         <button className="checkout-button" type="submit" disabled={loading}>
-          {loading ? "提交中..." : "提交订单"}
+          {loading ? t.submitting : t.submit}
         </button>
       </form>
     </main>

@@ -29,6 +29,17 @@ type OrderDetail = {
     unitPriceCents: number | null;
     lineTotalCents: number | null;
     quoteOnly: boolean;
+    vendorCode: string | null;
+    vendorName: string | null;
+    blendType: string | null;
+    ingredients: string | null;
+    ingredientQuantity: string | null;
+    heatTreatment: string | null;
+    processSpec: string | null;
+    grindingCostPer600gCents: number | null;
+    minimumQuantityKg: number | null;
+    depositCents: number | null;
+    balanceCents: number | null;
   }[];
 };
 
@@ -88,10 +99,25 @@ export default function AdminOrderDetailPage() {
         <div className="summary-box">
           <h2>订单内容</h2>
           {order.items.map((item) => (
-            <p key={item.id}>
-              <span>{item.productNameZh} x {item.quantity}</span>
-              <strong>{item.quoteOnly ? "询价" : formatMoney(item.lineTotalCents)}</strong>
-            </p>
+            <div className="admin-order-item" key={item.id}>
+              <p>
+                <span>{item.productNameZh} x {item.quantity}{item.vendorCode ? ` ${item.unit}` : ""}</span>
+                <strong>{item.quoteOnly ? "询价" : formatMoney(item.lineTotalCents)}</strong>
+              </p>
+              {item.vendorCode && (
+                <div className="custom-cart-details">
+                  <p><span>Vendor code</span><b>{item.vendorCode} · {item.vendorName}</b></p>
+                  <p><span>Blend type</span><b>{item.blendType}</b></p>
+                  <p><span>Ingredients</span><b>{item.ingredients}</b></p>
+                  <p><span>Quantity spec</span><b>{item.ingredientQuantity}</b></p>
+                  <p><span>Heat treatment</span><b>{item.heatTreatment}</b></p>
+                  <p><span>Baking / grinding</span><b>{item.processSpec}</b></p>
+                  <p><span>Grinding / 600g</span><b>{formatMoney(item.grindingCostPer600gCents)}</b></p>
+                  <p><span>70% deposit</span><b>{formatMoney(item.depositCents)}</b></p>
+                  <p><span>30% collection balance</span><b>{formatMoney(item.balanceCents)}</b></p>
+                </div>
+              )}
+            </div>
           ))}
           <p><span>商品小计</span><strong>{formatMoney(order.subtotalCents)}</strong></p>
           <p><span>GST 9%</span><strong>{formatMoney(order.gstCents)}</strong></p>
