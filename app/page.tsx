@@ -1,7 +1,7 @@
 "use client";
 
 import { useLanguagePreference } from "@/lib/language";
-import { ChevronLeft, ChevronRight, MapPin, Phone, ReceiptText } from "lucide-react";
+import { ChevronLeft, ChevronRight, MapPin, Phone, ReceiptText, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 const brand = "美人舟";
@@ -197,18 +197,23 @@ export default function Home() {
           <a href="#story">{t.nav.story}</a>
           <a href="#products">{t.nav.products}</a>
           <a href="/products">{t.nav.order}</a>
-          <a href="/cart">{t.nav.cart}</a>
           <a href="#contact">{t.nav.contact}</a>
         </nav>
-        <button
-          className="language-toggle"
-          type="button"
-          onClick={() => setLanguage(otherLanguage)}
-          aria-label={language === "zh" ? "Switch to English" : "切换到中文"}
-        >
-          <span className={language === "zh" ? "is-active" : ""}>中文</span>
-          <span className={language === "en" ? "is-active" : ""}>EN</span>
-        </button>
+        <div className="topbar-actions">
+          <a className="header-cart-link" href="/cart" aria-label={t.nav.cart}>
+            <ShoppingCart size={17} aria-hidden="true" />
+            <span>{t.nav.cart}</span>
+          </a>
+          <button
+            className="language-toggle"
+            type="button"
+            onClick={() => setLanguage(otherLanguage)}
+            aria-label={language === "zh" ? "Switch to English" : "切换到中文"}
+          >
+            <span className={language === "zh" ? "is-active" : ""}>中文</span>
+            <span className={language === "en" ? "is-active" : ""}>EN</span>
+          </button>
+        </div>
       </header>
 
       <section className="hero" id="top">
