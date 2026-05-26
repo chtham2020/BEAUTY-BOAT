@@ -20,6 +20,7 @@ async function main() {
       priceCents: 1100,
       quoteOnly: false,
       stock: 40,
+      active: true,
       image: "/images/carousel-five-spice.png",
     },
     {
@@ -32,6 +33,7 @@ async function main() {
       priceCents: 980,
       quoteOnly: false,
       stock: 35,
+      active: true,
       image: "/images/carousel-custom-blends.png",
     },
     {
@@ -44,6 +46,7 @@ async function main() {
       priceCents: null,
       quoteOnly: true,
       stock: 999,
+      active: true,
       image: "/images/carousel-spice-shop.png",
     },
   ];
