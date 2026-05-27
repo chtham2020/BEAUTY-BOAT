@@ -44,12 +44,20 @@ type OrderDetail = {
 };
 
 const statuses = ["pending", "quoted", "awaiting-payment", "paid", "processing", "completed", "cancelled"];
+const aiDraftKinds = [
+  { kind: "whatsapp", label: "WhatsApp 草稿" },
+  { kind: "summary", label: "订单摘要" },
+  { kind: "quote", label: "报价/供应商询价" },
+] as const;
 
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [deliveryFee, setDeliveryFee] = useState("");
   const [finalTotal, setFinalTotal] = useState("");
+  const [aiText, setAiText] = useState("");
+  const [aiError, setAiError] = useState("");
+  const [aiLoading, setAiLoading] = useState<string | null>(null);
 
   async function load() {
     const response = await fetch(`/api/admin/orders/${params.id}`);
@@ -80,6 +88,28 @@ export default function AdminOrderDetailPage() {
       body: JSON.stringify(data),
     });
     load();
+  }
+
+  async function generateAiDraft(kind: (typeof aiDraftKinds)[number]["kind"]) {
+    if (!order) return;
+    setAiLoading(kind);
+    setAiError("");
+    setAiText("");
+
+    const response = await fetch("/api/admin/ai/order-draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderId: order.id, kind }),
+    });
+    const data = await response.json();
+    setAiLoading(null);
+
+    if (!response.ok) {
+      setAiError(data.error || "AI 生成失败");
+      return;
+    }
+
+    setAiText(data.text || "");
   }
 
   if (!order) return <main className="shop-page">Loading...</main>;
@@ -160,6 +190,39 @@ export default function AdminOrderDetailPage() {
           <textarea readOnly value={order.followUpText} rows={9} />
           <a className="checkout-button" href={whatsappUrl} target="_blank" rel="noreferrer">打开 WhatsApp</a>
           <a className="cart-link" href={`tel:${order.customerPhone}`}>电话联系</a>
+        </div>
+
+        <div className="summary-box ai-panel">
+          <h2>Hermes AI 辅助</h2>
+          <p>AI 只生成草稿；请店家确认金额、运输费和付款状态后再发送。</p>
+          <div className="ai-action-grid">
+            {aiDraftKinds.map((draft) => (
+              <button
+                className="checkout-button"
+                type="button"
+                key={draft.kind}
+                onClick={() => generateAiDraft(draft.kind)}
+                disabled={aiLoading != null}
+              >
+                {aiLoading === draft.kind ? "生成中..." : draft.label}
+              </button>
+            ))}
+          </div>
+          {aiError && <p className="form-error">{aiError}</p>}
+          <textarea
+            readOnly
+            value={aiText}
+            rows={10}
+            placeholder="AI 草稿会显示在这里。"
+          />
+          <button
+            className="cart-link"
+            type="button"
+            disabled={!aiText}
+            onClick={() => navigator.clipboard.writeText(aiText)}
+          >
+            复制 AI 草稿
+          </button>
         </div>
       </section>
     </main>

@@ -4,6 +4,7 @@ out
 dist
 *.log
 .env*
+!.env.example
 prisma/*.db
 prisma/*.db-journal
 coverage

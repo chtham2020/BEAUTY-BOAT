@@ -39,3 +39,11 @@
 - Delivery fee is quoted separately for Lalamove/Grab and manually confirmed by the shop.
 - Self pickup can have zero delivery fee, but pickup time still needs shop confirmation.
 - Shop follows up orders by manually opening WhatsApp text links or phone links.
+
+## Hermes AI Experiment
+- AI features live only in the `codex/hermes-ai-assistant` worktree until merged.
+- Use `OPENAI_API_KEY` for server-side OpenAI access; never expose it to browser code.
+- AI may generate WhatsApp drafts, internal order summaries, and custom blend quote/supplier inquiry drafts.
+- AI output is always a draft for the shop to review; never auto-send WhatsApp, never auto-mark payment, and never auto-confirm delivery fees.
+- Send minimum order context to the model: order number, customer name, item summary, totals, delivery method, quote/vendor details, and customer note. Do not send customer phone unless a future feature explicitly requires it.
+- AI output must follow brand rules and must not use 「美人丹」, 「美人洲」, or 「源记」.
