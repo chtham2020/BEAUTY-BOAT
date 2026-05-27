@@ -22,7 +22,7 @@ export function makeFollowUpText(input: {
     : formatMoney(input.finalTotalCents ?? input.subtotalCents + input.gstCents);
 
   return [
-    `您好 ${input.customerName}，这里是 BEAUTY BOAT 美人舟。`,
+    `您好 ${input.customerName}，这里是福安，BEAUTY BOAT 美人舟品牌。`,
     `我们已收到订单 ${input.orderNumber}。`,
     `商品小计：${formatMoney(input.subtotalCents)}`,
     `GST 9%：${formatMoney(input.gstCents)}`,
