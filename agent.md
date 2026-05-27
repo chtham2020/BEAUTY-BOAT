@@ -42,7 +42,10 @@
 
 ## Hermes AI Experiment
 - AI features live only in the `codex/hermes-ai-assistant` worktree until merged.
-- Use `OPENAI_API_KEY` for server-side OpenAI access; never expose it to browser code.
+- Use server-side AI credentials only; never expose API keys to browser code.
+- `AI_PROVIDER` may be `openai` or `deepseek` in this experiment.
+- For OpenAI, use `OPENAI_API_KEY` and `OPENAI_MODEL`; for DeepSeek, use `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `DEEPSEEK_BASE_URL`.
+- `AI_API_KEY` and `AI_MODEL` may be used as generic fallbacks when testing one provider at a time.
 - AI may generate WhatsApp drafts, internal order summaries, and custom blend quote/supplier inquiry drafts.
 - AI output is always a draft for the shop to review; never auto-send WhatsApp, never auto-mark payment, and never auto-confirm delivery fees.
 - Send minimum order context to the model: order number, customer name, item summary, totals, delivery method, quote/vendor details, and customer note. Do not send customer phone unless a future feature explicitly requires it.

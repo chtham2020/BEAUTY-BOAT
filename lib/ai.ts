@@ -2,6 +2,7 @@ import OpenAI from "openai";
 import { formatMoney } from "./money";
 
 export type AiDraftKind = "whatsapp" | "summary" | "quote";
+type AiProvider = "openai" | "deepseek";
 
 type AiOrder = {
   orderNumber: string;
@@ -109,14 +110,21 @@ function safeOutput(text: string) {
     .trim();
 }
 
-export async function generateOrderAiDraft(kind: AiDraftKind, order: AiOrder) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("OPENAI_API_KEY is not configured");
+function aiProvider(): AiProvider {
+  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
+  if (provider === "openai" || provider === "deepseek") return provider;
+  throw new Error(`Unsupported AI_PROVIDER: ${provider}`);
+}
+
+async function generateWithOpenAI(kind: AiDraftKind, order: AiOrder) {
+  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY or AI_API_KEY is not configured");
   }
 
-  const client = new OpenAI();
+  const client = new OpenAI({ apiKey });
   const response = await client.responses.create({
-    model: process.env.OPENAI_MODEL || "gpt-4.1-mini",
+    model: process.env.OPENAI_MODEL || process.env.AI_MODEL || "gpt-4.1-mini",
     instructions: instructionsFor(kind),
     input: JSON.stringify({
       task: kindLabels[kind],
@@ -129,4 +137,42 @@ export async function generateOrderAiDraft(kind: AiDraftKind, order: AiOrder) {
   }
 
   return safeOutput(response.output_text);
+}
+
+async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
+  }
+
+  const client = new OpenAI({
+    apiKey,
+    baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+  });
+  const response = await client.chat.completions.create({
+    model: process.env.DEEPSEEK_MODEL || process.env.AI_MODEL || "deepseek-chat",
+    messages: [
+      { role: "system", content: instructionsFor(kind) },
+      {
+        role: "user",
+        content: JSON.stringify({
+          task: kindLabels[kind],
+          order: minimalOrderContext(order),
+        }),
+      },
+    ],
+    temperature: 0.3,
+  });
+  const text = response.choices[0]?.message?.content;
+  if (!text) {
+    throw new Error("DeepSeek response did not include message content");
+  }
+
+  return safeOutput(text);
+}
+
+export async function generateOrderAiDraft(kind: AiDraftKind, order: AiOrder) {
+  const provider = aiProvider();
+  if (provider === "deepseek") return generateWithDeepSeek(kind, order);
+  return generateWithOpenAI(kind, order);
 }
