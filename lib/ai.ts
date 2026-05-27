@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { formatMoney } from "./money";
 
 export type AiDraftKind = "whatsapp" | "summary" | "quote";
-type AiProvider = "openai" | "deepseek";
+type AiProvider = "openai" | "deepseek" | "deepseek-anthropic";
 
 type AiOrder = {
   orderNumber: string;
@@ -112,7 +112,9 @@ function safeOutput(text: string) {
 
 function aiProvider(): AiProvider {
   const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
-  if (provider === "openai" || provider === "deepseek") return provider;
+  if (provider === "openai" || provider === "deepseek" || provider === "deepseek-anthropic") {
+    return provider;
+  }
   throw new Error(`Unsupported AI_PROVIDER: ${provider}`);
 }
 
@@ -171,8 +173,54 @@ async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
   return safeOutput(text);
 }
 
+async function generateWithDeepSeekAnthropic(kind: AiDraftKind, order: AiOrder) {
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY;
+  if (!apiKey) {
+    throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
+  }
+
+  const baseUrl = (process.env.DEEPSEEK_ANTHROPIC_BASE_URL || "https://api.deepseek.com/anthropic")
+    .replace(/\/$/, "");
+  const response = await fetch(`${baseUrl}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: process.env.DEEPSEEK_ANTHROPIC_MODEL || process.env.DEEPSEEK_MODEL || process.env.AI_MODEL || "deepseek-chat",
+      max_tokens: 900,
+      system: instructionsFor(kind),
+      messages: [
+        {
+          role: "user",
+          content: JSON.stringify({
+            task: kindLabels[kind],
+            order: minimalOrderContext(order),
+          }),
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`DeepSeek Anthropic request failed: ${response.status} ${details.slice(0, 240)}`);
+  }
+
+  const data = (await response.json()) as { content?: { type?: string; text?: string }[] };
+  const text = data.content?.find((block) => block.type === "text" && block.text)?.text;
+  if (!text) {
+    throw new Error("DeepSeek Anthropic response did not include text content");
+  }
+
+  return safeOutput(text);
+}
+
 export async function generateOrderAiDraft(kind: AiDraftKind, order: AiOrder) {
   const provider = aiProvider();
+  if (provider === "deepseek-anthropic") return generateWithDeepSeekAnthropic(kind, order);
   if (provider === "deepseek") return generateWithDeepSeek(kind, order);
   return generateWithOpenAI(kind, order);
 }

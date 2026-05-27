@@ -43,8 +43,9 @@
 ## Hermes AI Experiment
 - AI features live only in the `codex/hermes-ai-assistant` worktree until merged.
 - Use server-side AI credentials only; never expose API keys to browser code.
-- `AI_PROVIDER` may be `openai` or `deepseek` in this experiment.
+- `AI_PROVIDER` may be `openai`, `deepseek`, or `deepseek-anthropic` in this experiment.
 - For OpenAI, use `OPENAI_API_KEY` and `OPENAI_MODEL`; for DeepSeek, use `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `DEEPSEEK_BASE_URL`.
+- For DeepSeek Anthropic-compatible mode, use `DEEPSEEK_API_KEY`, `DEEPSEEK_ANTHROPIC_MODEL`, and `DEEPSEEK_ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`.
 - `AI_API_KEY` and `AI_MODEL` may be used as generic fallbacks when testing one provider at a time.
 - AI may generate WhatsApp drafts, internal order summaries, and custom blend quote/supplier inquiry drafts.
 - AI output is always a draft for the shop to review; never auto-send WhatsApp, never auto-mark payment, and never auto-confirm delivery fees.
