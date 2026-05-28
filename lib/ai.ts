@@ -142,7 +142,7 @@ async function generateWithOpenAI(kind: AiDraftKind, order: AiOrder) {
 }
 
 async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
-  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY;
+  const apiKey = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
   }
@@ -174,7 +174,7 @@ async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
 }
 
 async function generateWithDeepSeekAnthropic(kind: AiDraftKind, order: AiOrder) {
-  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY;
+  const apiKey = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
   }
