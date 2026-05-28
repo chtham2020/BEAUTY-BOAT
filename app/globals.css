@@ -840,8 +840,17 @@ footer p {
   padding: 12px;
 }
 
+.ingredient-line-table {
+  display: grid;
+  gap: 4px;
+  border-top: 1px solid rgba(36, 26, 19, 0.1);
+  border-bottom: 1px solid rgba(36, 26, 19, 0.1);
+  padding: 8px 0;
+}
+
 .quote-panel p,
 .custom-cart-details p,
+.ingredient-line-table p,
 .admin-order-item > p {
   display: flex;
   justify-content: space-between;
@@ -996,9 +1005,40 @@ footer p {
   text-align: left;
 }
 
+.admin-row-main {
+  display: contents;
+  color: inherit;
+}
+
 .admin-row button {
   background: rgba(47, 102, 82, 0.1);
   color: var(--green);
+}
+
+.admin-row button.danger-button,
+.checkout-form .danger-button {
+  background: rgba(164, 31, 18, 0.1);
+  color: #a41f12;
+}
+
+.admin-price-control {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+  font-size: 0.8rem;
+  font-weight: 800;
+  min-width: 120px;
+}
+
+.admin-price-control input {
+  width: 120px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf7;
+  color: var(--ink);
+  font: inherit;
+  padding: 10px;
 }
 
 .order-detail {
@@ -1007,6 +1047,264 @@ footer p {
 
 .order-detail .summary-box:last-child {
   grid-column: 1 / -1;
+}
+
+.customer-row {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.invoice-page {
+  min-height: 100vh;
+  background: #efe8da;
+  padding: 28px;
+}
+
+.invoice-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  width: min(900px, 100%);
+  margin: 0 auto 16px;
+}
+
+.invoice-print-button,
+.invoice-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--green);
+  color: #fff7e8;
+  cursor: pointer;
+  font-weight: 800;
+  padding: 0 18px;
+}
+
+.invoice-nav-button {
+  background: #fffaf0;
+  color: var(--green);
+  border: 1px solid rgba(47, 102, 82, 0.24);
+}
+
+.invoice-sheet {
+  width: min(900px, 100%);
+  min-height: 1240px;
+  margin: 0 auto;
+  border: 1px solid #d5bda2;
+  background: #fffaf0;
+  color: #2d2520;
+  font-family: Arial, "Noto Sans TC", sans-serif;
+  padding: 42px;
+  box-shadow: 0 24px 70px rgba(63, 42, 25, 0.16);
+}
+
+.invoice-company {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr) 230px;
+  gap: 20px;
+  align-items: start;
+  border-bottom: 2px solid #b43a24;
+  padding-bottom: 22px;
+}
+
+.invoice-logo-wrap {
+  display: grid;
+  place-items: center;
+}
+
+.invoice-company h1 {
+  margin: 0;
+  color: #b43a24;
+  font-size: 2.4rem;
+  letter-spacing: 0;
+}
+
+.invoice-company h2 {
+  margin: 2px 0 10px;
+  color: #2d2520;
+  font-size: 1.35rem;
+}
+
+.invoice-company p,
+.invoice-billto p,
+.invoice-note,
+.invoice-footer p {
+  margin: 3px 0;
+  line-height: 1.45;
+}
+
+.ingredient-total-row {
+  border-top: 1px solid rgba(36, 26, 19, 0.12);
+  color: var(--wood);
+  font-weight: 800;
+  padding-top: 6px;
+}
+
+.admin-ingredient-editor {
+  display: grid;
+  gap: 8px;
+}
+
+.admin-ingredient-header,
+.admin-ingredient-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 1fr) 82px 92px 110px;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-ingredient-header {
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-ingredient-row input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf7;
+  color: var(--ink);
+  font: inherit;
+  padding: 9px;
+}
+
+.admin-ingredient-row strong {
+  text-align: right;
+}
+
+.invoice-title-block {
+  text-align: right;
+}
+
+.invoice-title-block strong {
+  display: block;
+  color: #b43a24;
+  font-size: 2rem;
+}
+
+.invoice-title-block span {
+  display: block;
+  margin-bottom: 14px;
+  font-weight: 800;
+}
+
+.invoice-billto {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 0.55fr);
+  gap: 28px;
+  margin: 28px 0;
+}
+
+.invoice-billto > div {
+  min-height: 120px;
+  border: 1px solid #e0c9ad;
+  background: #fffdf7;
+  padding: 16px;
+}
+
+.invoice-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.invoice-table th {
+  border: 1px solid #9d8975;
+  background: #f2e4ce;
+  color: #2d2520;
+  padding: 10px 8px;
+  text-align: center;
+}
+
+.invoice-table td {
+  border: 1px solid #c7ae93;
+  padding: 12px 8px;
+  vertical-align: top;
+}
+
+.invoice-table td:nth-child(1),
+.invoice-table td:nth-child(4),
+.invoice-table td:nth-child(5) {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.invoice-table td:nth-child(3),
+.invoice-table td:nth-child(6) {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.invoice-table tfoot td:first-child {
+  text-align: right;
+}
+
+.invoice-table td strong,
+.invoice-table td span {
+  display: block;
+}
+
+.invoice-table tfoot td {
+  font-weight: 800;
+}
+
+.invoice-total-row td {
+  background: #fff1dc;
+  color: #8d2f1f;
+  font-size: 1.08rem;
+}
+
+.invoice-note {
+  margin-top: 16px;
+  color: #705d4d;
+  font-size: 0.92rem;
+}
+
+.invoice-footer {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 48px;
+  margin-top: 80px;
+}
+
+.invoice-footer > div {
+  border-top: 1px solid #2d2520;
+  padding-top: 10px;
+}
+
+.invoice-footer span {
+  color: #705d4d;
+  font-size: 0.9rem;
+}
+
+@media print {
+  body {
+    background: #fff;
+  }
+
+  .invoice-page {
+    background: #fff;
+    padding: 0;
+  }
+
+  .invoice-toolbar {
+    display: none;
+  }
+
+  .invoice-sheet {
+    width: 100%;
+    min-height: 0;
+    border: 0;
+    box-shadow: none;
+    padding: 18mm;
+  }
 }
 
 @media (max-width: 940px) {
@@ -1046,7 +1344,7 @@ footer p {
   .order-detail,
   .custom-cta,
   .contact-grid,
-  .map-card {
+    .map-card {
     grid-template-columns: 1fr;
   }
 
@@ -1057,6 +1355,30 @@ footer p {
   .cart-line,
   .admin-row {
     grid-template-columns: 1fr;
+  }
+
+  .invoice-page {
+    padding: 12px;
+  }
+
+  .invoice-sheet {
+    min-height: 0;
+    overflow-x: auto;
+    padding: 20px;
+  }
+
+  .invoice-company,
+  .invoice-billto,
+  .invoice-footer {
+    grid-template-columns: 1fr;
+  }
+
+  .invoice-title-block {
+    text-align: left;
+  }
+
+  .invoice-table {
+    min-width: 760px;
   }
 
   .story {

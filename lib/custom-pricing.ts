@@ -7,13 +7,26 @@ export function customCartKey(productId: string, vendorCode?: string) {
   return vendorCode ? `${productId}:${vendorCode.toUpperCase()}` : productId;
 }
 
-export function calculateGrindingCostCents(quantityKg: number, costPer600gCents: number) {
-  if (quantityKg <= 0 || costPer600gCents <= 0) return 0;
-  return Math.ceil((quantityKg * 1000) / 600) * costPer600gCents;
+export function getCustomBlendWeightJin(quantity: number, quote: CustomQuoteSnapshot) {
+  return quote.totalWeightJin ?? quote.minimumQuantityJin ?? quantity;
 }
 
-export function calculateCustomLineTotalCents(quantityKg: number, quote: CustomQuoteSnapshot) {
-  return quote.unitPriceCents * quantityKg + calculateGrindingCostCents(quantityKg, quote.grindingCostPer600gCents);
+export function calculateGrindingCostCents(quantityJin: number, costPer600gCents: number) {
+  if (quantityJin <= 0 || costPer600gCents <= 0) return 0;
+  return Math.round(quantityJin * costPer600gCents);
+}
+
+export function calculateCustomLineTotalCents(quantity: number, quote: CustomQuoteSnapshot) {
+  const weightJin = getCustomBlendWeightJin(quantity, quote);
+  const grindingCostPerJinCents = quote.grindingCostPerJinCents ?? quote.grindingCostPer600gCents;
+  const ingredientSubtotal =
+    quote.ingredientLines?.reduce(
+      (sum, ingredient) =>
+        sum + (ingredient.lineTotalCents ?? Math.round(ingredient.quantityJin * (ingredient.unitPriceCents ?? 0))),
+      0,
+    ) ?? quote.unitPriceCents * weightJin;
+
+  return ingredientSubtotal + calculateGrindingCostCents(weightJin, grindingCostPerJinCents);
 }
 
 export function calculateDepositCents(customSubtotalCents: number) {

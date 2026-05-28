@@ -59,6 +59,31 @@ async function main() {
     });
   }
 
+  await prisma.customer.upsert({
+    where: { id: "yu-xiang-trading" },
+    update: {
+      nameZh: "昱翔贸易私人有限公司",
+      nameEn: "Yu Xiang Trading Pte Ltd",
+      addressLine1: "192 Pandan Loop #07-18N",
+      addressLine2: "Pantech Business Hub",
+      postalCode: "128381",
+      phone: "67736331 / 67730091",
+      notes: "Imported from existing FOOK ON invoice sample.",
+      active: true,
+    },
+    create: {
+      id: "yu-xiang-trading",
+      nameZh: "昱翔贸易私人有限公司",
+      nameEn: "Yu Xiang Trading Pte Ltd",
+      addressLine1: "192 Pandan Loop #07-18N",
+      addressLine2: "Pantech Business Hub",
+      postalCode: "128381",
+      phone: "67736331 / 67730091",
+      notes: "Imported from existing FOOK ON invoice sample.",
+      active: true,
+    },
+  });
+
   const email = process.env.HERMES_ADMIN_EMAIL || "admin@beautyboat.local";
   const password = process.env.HERMES_ADMIN_PASSWORD || "admin12345";
   const existing = await prisma.adminUser.findUnique({ where: { email } });

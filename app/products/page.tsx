@@ -1,7 +1,7 @@
 "use client";
 
 import { formatMoney } from "@/lib/money";
-import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, customCartKey } from "@/lib/custom-pricing";
+import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, customCartKey, getCustomBlendWeightJin } from "@/lib/custom-pricing";
 import type { CartStoredItem, CustomQuoteSnapshot, PublicProduct } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
 import { Check, House, ShoppingCart, Square } from "lucide-react";
@@ -33,6 +33,7 @@ const copy = {
     heatTreatment: "Heat treatment",
     processSpec: "Baking / grinding spec",
     minimumQuantity: "Minimum quantity",
+    totalWeight: "总重量",
     grindingCost: "Grinding cost / 600g",
     deposit: "70% deposit",
     balance: "30% upon collection",
@@ -60,6 +61,7 @@ const copy = {
     heatTreatment: "Heat Treatment",
     processSpec: "Baking / Grinding Spec",
     minimumQuantity: "Minimum Quantity",
+    totalWeight: "Total Weight",
     grindingCost: "Grinding Cost / 600g",
     deposit: "70% Deposit",
     balance: "30% Upon Collection",
@@ -130,7 +132,7 @@ export default function ProductsPage() {
     const existing = cart.find((item) => customCartKey(item.productId, item.customQuote?.vendorCode) === key);
     const nextCart = existing
       ? cart.filter((item) => customCartKey(item.productId, item.customQuote?.vendorCode) !== key)
-      : [...cart, { productId: product.id, quantity: customQuote?.minimumQuantityKg ?? 1, customQuote }];
+      : [...cart, { productId: product.id, quantity: customQuote ? getCustomBlendWeightJin(customQuote.minimumQuantityJin ?? customQuote.minimumQuantityKg, customQuote) : 1, customQuote }];
 
     writeCart(nextCart);
     refreshCartState();
@@ -265,11 +267,29 @@ export default function ProductsPage() {
                         <strong>{t.quoteReady}: {quote.vendorCode}</strong>
                         <p>{quote.vendorName} · {quote.blendType}</p>
                         <p><span>{t.ingredients}</span><b>{quote.ingredients.join(", ")}</b></p>
+                        {quote.ingredientLines && (
+                          <div className="ingredient-line-table">
+                            {quote.ingredientLines.map((ingredient) => (
+                              <p key={ingredient.name}>
+                                <span>{ingredient.name}</span>
+                                <b>
+                                  {ingredient.quantityJin}斤
+                                  {ingredient.unitPriceCents != null && ` × ${formatMoney(ingredient.unitPriceCents)}`}
+                                  {ingredient.lineTotalCents != null && ` = ${formatMoney(ingredient.lineTotalCents)}`}
+                                </b>
+                              </p>
+                            ))}
+                            <p className="ingredient-total-row">
+                              <span>{t.totalWeight}</span>
+                              <b>{getCustomBlendWeightJin(quote.minimumQuantityJin ?? quote.minimumQuantityKg, quote)}斤</b>
+                            </p>
+                          </div>
+                        )}
                         <p><span>{t.unit}</span><b>{quote.ingredientQuantity}</b></p>
                         <p><span>{t.heatTreatment}</span><b>{quote.heatTreatment}</b></p>
                         <p><span>{t.processSpec}</span><b>{quote.processSpec}</b></p>
-                        <p><span>{t.minimumQuantity}</span><b>{quote.minimumQuantityKg}kg</b></p>
-                        <p><span>{t.grindingCost}</span><b>{formatMoney(quote.grindingCostPer600gCents)}</b></p>
+                        <p><span>{t.minimumQuantity}</span><b>{getCustomBlendWeightJin(quote.minimumQuantityJin ?? quote.minimumQuantityKg, quote)}斤</b></p>
+                        <p><span>{t.grindingCost}</span><b>{formatMoney(quote.grindingCostPerJinCents ?? quote.grindingCostPer600gCents)} / 斤</b></p>
                         <p><span>{t.deposit}</span><b>{formatMoney(calculateDepositCents(sampleLineTotal))}</b></p>
                         <p><span>{t.balance}</span><b>{formatMoney(calculateBalanceCents(sampleLineTotal))}</b></p>
                       </div>

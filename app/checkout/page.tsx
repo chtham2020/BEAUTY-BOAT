@@ -75,6 +75,8 @@ export default function CheckoutPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartStoredItem[]>([]);
+  const [gstRate, setGstRate] = useState<0 | 9>(0);
+  const [depositRequired, setDepositRequired] = useState(true);
   const t = copy[language];
 
   useEffect(() => {
@@ -88,10 +90,10 @@ export default function CheckoutPage() {
     }, 0);
     return {
       customSubtotal,
-      deposit: calculateDepositCents(customSubtotal),
-      balance: calculateBalanceCents(customSubtotal),
+      deposit: depositRequired ? calculateDepositCents(customSubtotal) : 0,
+      balance: depositRequired ? calculateBalanceCents(customSubtotal) : customSubtotal,
     };
-  }, [cartItems]);
+  }, [cartItems, depositRequired]);
 
   async function submit(formData: FormData) {
     setError("");
@@ -112,6 +114,8 @@ export default function CheckoutPage() {
         deliveryMethod: formData.get("deliveryMethod"),
         deliveryNote: formData.get("deliveryNote"),
         customerNote: formData.get("customerNote"),
+        gstRate,
+        depositRequired,
         items,
       }),
     });
@@ -161,6 +165,23 @@ export default function CheckoutPage() {
           </select>
         </label>
         <label>
+          GST
+          <select value={gstRate} onChange={(event) => setGstRate(Number(event.target.value) as 0 | 9)}>
+            <option value={0}>0% - Non GST registered / waived</option>
+            <option value={9}>9%</option>
+          </select>
+        </label>
+        <label>
+          Custom Blend deposit
+          <select
+            value={depositRequired ? "new" : "repeat"}
+            onChange={(event) => setDepositRequired(event.target.value === "new")}
+          >
+            <option value="new">New customer: 70% deposit</option>
+            <option value="repeat">Repeat customer: deposit waived</option>
+          </select>
+        </label>
+        <label>
           {t.deliveryNote}
           <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} />
         </label>
@@ -169,7 +190,7 @@ export default function CheckoutPage() {
           <textarea name="customerNote" rows={4} placeholder={t.orderPlaceholder} />
         </label>
         <div className="summary-box">
-          <p><span>GST</span><strong>9%</strong></p>
+          <p><span>GST</span><strong>{gstRate}%</strong></p>
           {customTotals.customSubtotal > 0 && (
             <>
               <p><span>{t.customSubtotal}</span><strong>{formatMoney(customTotals.customSubtotal)}</strong></p>

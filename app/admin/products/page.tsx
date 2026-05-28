@@ -34,6 +34,7 @@ const emptyForm: ProductForm = {
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [form, setForm] = useState<ProductForm>(emptyForm);
+  const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
 
   async function load() {
     const response = await fetch("/api/admin/products");
@@ -41,7 +42,12 @@ export default function AdminProductsPage() {
       window.location.href = "/admin/login";
       return;
     }
-    setProducts(await response.json());
+    const data = await response.json();
+    setProducts(data);
+    setPriceDrafts(Object.fromEntries(data.map((product: PublicProduct) => [
+      product.id,
+      product.priceCents == null ? "" : String(product.priceCents / 100),
+    ])));
   }
 
   useEffect(() => {
@@ -85,7 +91,10 @@ export default function AdminProductsPage() {
           <p className="eyebrow">Hermes Admin</p>
           <h1>产品与库存</h1>
         </div>
-        <Link className="cart-link" href="/admin/orders">查看订单</Link>
+        <div className="shop-actions">
+          <Link className="cart-link" href="/admin/customers">客户资料</Link>
+          <Link className="cart-link" href="/admin/orders">查看订单</Link>
+        </div>
       </header>
 
       <section className="admin-layout">
@@ -97,6 +106,25 @@ export default function AdminProductsPage() {
                 <p>{product.nameEn} · {product.unit}</p>
                 <p>{product.quoteOnly ? "询价" : formatMoney(product.priceCents)} · 库存 {product.stock}</p>
               </div>
+              <label className="admin-price-control">
+                价格 SGD
+                <input
+                  value={priceDrafts[product.id] ?? ""}
+                  onChange={(event) => setPriceDrafts({ ...priceDrafts, [product.id]: event.target.value })}
+                  disabled={product.quoteOnly}
+                />
+              </label>
+              <button
+                type="button"
+                disabled={product.quoteOnly}
+                onClick={() =>
+                  updateProduct(product, {
+                    priceCents: priceDrafts[product.id] ? Math.round(Number(priceDrafts[product.id]) * 100) : null,
+                  })
+                }
+              >
+                保存价格
+              </button>
               <button type="button" onClick={() => updateProduct(product, { active: !product.active })}>
                 {product.active ? "下架" : "上架"}
               </button>

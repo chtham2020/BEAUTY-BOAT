@@ -11,3 +11,7 @@ export function formatMoney(cents: number | null | undefined) {
 export function calculateGst(subtotalCents: number) {
   return Math.round(subtotalCents * GST_RATE);
 }
+
+export function calculateGstWithRate(subtotalCents: number, gstRate: 0 | 9) {
+  return Math.round(subtotalCents * (gstRate / 100));
+}

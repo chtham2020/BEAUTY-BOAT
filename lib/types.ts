@@ -17,11 +17,20 @@ export type CustomQuoteSnapshot = {
   vendorName: string;
   blendType: string;
   ingredients: string[];
+  ingredientLines?: {
+    name: string;
+    quantityJin: number;
+    unitPriceCents?: number;
+    lineTotalCents?: number;
+  }[];
   ingredientQuantity: string;
   unit: string;
   heatTreatment: string;
   processSpec: string;
   grindingCostPer600gCents: number;
+  totalWeightJin?: number;
+  grindingCostPerJinCents?: number;
+  minimumQuantityJin?: number;
   minimumQuantityKg: number;
   unitPriceCents: number;
 };

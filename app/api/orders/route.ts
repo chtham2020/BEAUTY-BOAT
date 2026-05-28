@@ -1,5 +1,7 @@
-import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents } from "@/lib/custom-pricing";
+import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, getCustomBlendWeightJin } from "@/lib/custom-pricing";
+import { formatIngredientLines } from "@/lib/custom-ingredients";
 import { makeFollowUpText, makeOrderNumber } from "@/lib/hermes";
+import { calculateGstWithRate } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import { getVendorQuote } from "@/lib/vendor-quotes";
 import { z } from "zod";
@@ -11,11 +13,13 @@ const orderSchema = z.object({
   customerNote: z.string().optional(),
   deliveryMethod: z.enum(["third-party", "self-pickup"]),
   deliveryNote: z.string().optional(),
+  gstRate: z.union([z.literal(0), z.literal(9)]).default(0),
+  depositRequired: z.boolean().default(true),
   items: z
     .array(
       z.object({
         productId: z.string().min(1),
-        quantity: z.number().int().min(1).max(999),
+        quantity: z.number().min(0.5).max(999),
         customQuote: z
           .object({
             vendorCode: z.string().min(1),
@@ -54,7 +58,7 @@ export async function POST(request: Request) {
     if (product.id === CUSTOM_BLEND_PRODUCT_ID && !customQuote) {
       throw new Error("VENDOR_CODE_REQUIRED");
     }
-    if (customQuote && item.quantity < customQuote.minimumQuantityKg) {
+    if (customQuote && item.quantity < getCustomBlendWeightJin(customQuote.minimumQuantityJin ?? customQuote.minimumQuantityKg, customQuote)) {
       throw new Error("MINIMUM_QUANTITY");
     }
     if (!product.quoteOnly && product.stock < item.quantity) {
@@ -71,7 +75,7 @@ export async function POST(request: Request) {
   const hasQuoteItems = lines.some(
     (line) => !line.customQuote && (line.product.quoteOnly || line.product.priceCents == null),
   );
-  const gstCents = Math.round(subtotalCents * 0.09);
+  const gstCents = calculateGstWithRate(subtotalCents, parsed.data.gstRate);
   const totals = { subtotalCents, gstCents, hasQuoteItems };
   const finalTotalCents = totals.hasQuoteItems ? null : totals.subtotalCents + totals.gstCents;
   const orderNumber = makeOrderNumber();
@@ -82,6 +86,7 @@ export async function POST(request: Request) {
     customerName: parsed.data.customerName,
     subtotalCents: totals.subtotalCents,
     gstCents: totals.gstCents,
+    gstRate: parsed.data.gstRate,
     hasQuoteItems: totals.hasQuoteItems,
     deliveryMethod: deliveryLabel,
     finalTotalCents,
@@ -96,10 +101,12 @@ export async function POST(request: Request) {
         deliveryMethod: parsed.data.deliveryMethod,
         deliveryNote: parsed.data.deliveryNote,
         subtotalCents: totals.subtotalCents,
+        gstRate: parsed.data.gstRate,
         gstCents: totals.gstCents,
         finalTotalCents,
         deliveryFeeCents: parsed.data.deliveryMethod === "self-pickup" ? 0 : null,
         hasQuoteItems: totals.hasQuoteItems,
+        depositRequired: parsed.data.depositRequired,
         followUpText,
         items: {
           create: lines.map((line) => ({
@@ -118,17 +125,31 @@ export async function POST(request: Request) {
             vendorCode: line.customQuote?.vendorCode,
             vendorName: line.customQuote?.vendorName,
             blendType: line.customQuote?.blendType,
-            ingredients: line.customQuote?.ingredients.join(", "),
-            ingredientQuantity: line.customQuote?.ingredientQuantity,
+            ingredients: line.customQuote?.ingredientLines
+              ? formatIngredientLines(
+                  line.customQuote.ingredientLines.map((ingredient) => ({
+                    name: ingredient.name,
+                    quantityJin: ingredient.quantityJin,
+                    unitPriceCents: ingredient.unitPriceCents ?? 0,
+                  })),
+                )
+              : line.customQuote?.ingredients.join(", "),
+            ingredientQuantity: line.customQuote
+              ? `${getCustomBlendWeightJin(line.quantity, line.customQuote)}斤 total, 1斤 = 600g`
+              : undefined,
             heatTreatment: line.customQuote?.heatTreatment,
             processSpec: line.customQuote?.processSpec,
             grindingCostPer600gCents: line.customQuote?.grindingCostPer600gCents,
-            minimumQuantityKg: line.customQuote?.minimumQuantityKg,
-            depositCents: line.customQuote
-              ? calculateDepositCents(calculateCustomLineTotalCents(line.quantity, line.customQuote))
+            minimumQuantityKg: line.customQuote
+              ? getCustomBlendWeightJin(line.customQuote.minimumQuantityJin ?? line.customQuote.minimumQuantityKg, line.customQuote)
               : undefined,
+            depositCents: line.customQuote && parsed.data.depositRequired
+              ? calculateDepositCents(calculateCustomLineTotalCents(line.quantity, line.customQuote))
+              : line.customQuote ? 0 : undefined,
             balanceCents: line.customQuote
-              ? calculateBalanceCents(calculateCustomLineTotalCents(line.quantity, line.customQuote))
+              ? parsed.data.depositRequired
+                ? calculateBalanceCents(calculateCustomLineTotalCents(line.quantity, line.customQuote))
+                : calculateCustomLineTotalCents(line.quantity, line.customQuote)
               : undefined,
           })),
         },

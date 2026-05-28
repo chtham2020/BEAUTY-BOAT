@@ -1,8 +1,9 @@
 "use client";
 
+import { parseIngredientLines, type IngredientPriceLine } from "@/lib/custom-ingredients";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 
 type OrderDetail = {
@@ -15,11 +16,15 @@ type OrderDetail = {
   deliveryNote: string | null;
   status: string;
   subtotalCents: number;
+  gstRate: 0 | 9;
   gstCents: number;
   deliveryFeeCents: number | null;
   finalTotalCents: number | null;
   hasQuoteItems: boolean;
+  depositRequired: boolean;
   followUpText: string;
+  customerId: string | null;
+  billToCustomer: CustomerSummary | null;
   items: {
     id: string;
     productNameZh: string;
@@ -43,6 +48,25 @@ type OrderDetail = {
   }[];
 };
 
+type CustomerSummary = {
+  id: string;
+  nameZh: string;
+  nameEn: string | null;
+  phone: string | null;
+  active: boolean;
+};
+
+type IngredientDraftLine = {
+  name: string;
+  quantityJin: number;
+  unitPrice: string;
+};
+
+type CustomBlendDraft = {
+  lines: IngredientDraftLine[];
+  grindingCostPerJin: string;
+};
+
 const statuses = ["pending", "quoted", "awaiting-payment", "paid", "processing", "completed", "cancelled"];
 const aiDraftKinds = [
   { kind: "whatsapp", label: "WhatsApp 草稿" },
@@ -52,9 +76,15 @@ const aiDraftKinds = [
 
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [deliveryFee, setDeliveryFee] = useState("");
   const [finalTotal, setFinalTotal] = useState("");
+  const [gstRate, setGstRate] = useState<0 | 9>(0);
+  const [depositRequired, setDepositRequired] = useState(true);
+  const [customers, setCustomers] = useState<CustomerSummary[]>([]);
+  const [customerId, setCustomerId] = useState("");
+  const [customBlendDrafts, setCustomBlendDrafts] = useState<Record<string, CustomBlendDraft>>({});
   const [aiText, setAiText] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState<string | null>(null);
@@ -67,12 +97,35 @@ export default function AdminOrderDetailPage() {
     }
     const data = await response.json();
     setOrder(data);
+    setCustomerId(data.customerId ?? "");
+    setGstRate(data.gstRate ?? 0);
+    setDepositRequired(data.depositRequired ?? true);
     setDeliveryFee(data.deliveryFeeCents == null ? "" : String(data.deliveryFeeCents / 100));
     setFinalTotal(data.finalTotalCents == null ? "" : String(data.finalTotalCents / 100));
+    setCustomBlendDrafts(
+      Object.fromEntries(
+        data.items
+          .filter((item: OrderDetail["items"][number]) => item.vendorCode)
+          .map((item: OrderDetail["items"][number]) => [
+            item.id,
+            {
+              lines: parseIngredientLines(item.ingredients).map((line: IngredientPriceLine) => ({
+                name: line.name,
+                quantityJin: line.quantityJin,
+                unitPrice: String(line.unitPriceCents / 100),
+              })),
+              grindingCostPerJin: item.grindingCostPer600gCents == null ? "" : String(item.grindingCostPer600gCents / 100),
+            },
+          ]),
+      ),
+    );
   }
 
   useEffect(() => {
     load();
+    fetch("/api/admin/customers").then(async (response) => {
+      if (response.ok) setCustomers(await response.json());
+    });
   }, []);
 
   const whatsappUrl = useMemo(() => {
@@ -88,6 +141,54 @@ export default function AdminOrderDetailPage() {
       body: JSON.stringify(data),
     });
     load();
+  }
+
+  async function deleteCancelledOrder() {
+    if (!order || order.status !== "cancelled") return;
+    const ok = window.confirm("Delete this cancelled order permanently?");
+    if (!ok) return;
+
+    const response = await fetch(`/api/admin/orders/${params.id}`, { method: "DELETE" });
+    if (response.ok) {
+      router.push("/admin/orders");
+      return;
+    }
+    const data = await response.json().catch(() => null);
+    window.alert(data?.error || "Order delete failed");
+  }
+
+  function updateIngredientDraft(itemId: string, index: number, data: Partial<IngredientDraftLine>) {
+    setCustomBlendDrafts((current) => {
+      const draft = current[itemId];
+      if (!draft) return current;
+      const lines = draft.lines.map((line, lineIndex) => (lineIndex === index ? { ...line, ...data } : line));
+      return { ...current, [itemId]: { ...draft, lines } };
+    });
+  }
+
+  async function saveCustomBlendItem(itemId: string) {
+    const draft = customBlendDrafts[itemId];
+    if (!draft) return;
+
+    const response = await fetch(`/api/admin/order-items/${itemId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ingredientLines: draft.lines.map((line) => ({
+          name: line.name,
+          quantityJin: Number(line.quantityJin),
+          unitPriceCents: Math.round(Number(line.unitPrice || 0) * 100),
+        })),
+        grindingCostPerJinCents: Math.round(Number(draft.grindingCostPerJin || 0) * 100),
+      }),
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      window.alert(data?.error || "Custom blend update failed");
+      return;
+    }
+    await load();
   }
 
   async function generateAiDraft(kind: (typeof aiDraftKinds)[number]["kind"]) {
@@ -122,7 +223,10 @@ export default function AdminOrderDetailPage() {
           <h1>{order.orderNumber}</h1>
           <p>{order.customerName} · {order.customerPhone}</p>
         </div>
-        <Link className="cart-link" href="/admin/orders">返回订单</Link>
+        <div className="shop-actions">
+          <Link className="cart-link" href="/admin/customers">客户资料</Link>
+          <Link className="cart-link" href="/admin/orders">返回订单</Link>
+        </div>
       </header>
 
       <section className="order-detail">
@@ -138,19 +242,82 @@ export default function AdminOrderDetailPage() {
                 <div className="custom-cart-details">
                   <p><span>Vendor code</span><b>{item.vendorCode} · {item.vendorName}</b></p>
                   <p><span>Blend type</span><b>{item.blendType}</b></p>
-                  <p><span>Ingredients</span><b>{item.ingredients}</b></p>
-                  <p><span>Quantity spec</span><b>{item.ingredientQuantity}</b></p>
+                  {customBlendDrafts[item.id]?.lines.length > 0 && (
+                    <div className="admin-ingredient-editor">
+                      <div className="admin-ingredient-header">
+                        <span>Ingredient</span>
+                        <span>Qty 斤</span>
+                        <span>Unit $</span>
+                        <span>Amount</span>
+                      </div>
+                      {customBlendDrafts[item.id].lines.map((line, index) => {
+                        const amount = Number(line.quantityJin) * Number(line.unitPrice || 0);
+                        return (
+                          <div className="admin-ingredient-row" key={`${item.id}-${line.name}-${index}`}>
+                            <input
+                              value={line.name}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { name: event.target.value })}
+                            />
+                            <input
+                              type="number"
+                              step="0.5"
+                              min="0"
+                              value={line.quantityJin}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { quantityJin: Number(event.target.value) })}
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={line.unitPrice}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { unitPrice: event.target.value })}
+                            />
+                            <strong>{formatMoney(Math.round(amount * 100))}</strong>
+                          </div>
+                        );
+                      })}
+                      <div className="admin-ingredient-row">
+                        <span>Grinding / 斤</span>
+                        <span>{customBlendDrafts[item.id].lines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0)}斤</span>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={customBlendDrafts[item.id].grindingCostPerJin}
+                          onChange={(event) =>
+                            setCustomBlendDrafts((current) => ({
+                              ...current,
+                              [item.id]: { ...current[item.id], grindingCostPerJin: event.target.value },
+                            }))
+                          }
+                        />
+                        <strong>
+                          {formatMoney(
+                            Math.round(
+                              customBlendDrafts[item.id].lines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0) *
+                                Number(customBlendDrafts[item.id].grindingCostPerJin || 0) *
+                                100,
+                            ),
+                          )}
+                        </strong>
+                      </div>
+                      <button className="checkout-button" type="button" onClick={() => saveCustomBlendItem(item.id)}>
+                        Save ingredient prices
+                      </button>
+                    </div>
+                  )}
+                  <p><span>Total weight</span><b>{item.ingredientQuantity}</b></p>
                   <p><span>Heat treatment</span><b>{item.heatTreatment}</b></p>
                   <p><span>Baking / grinding</span><b>{item.processSpec}</b></p>
-                  <p><span>Grinding / 600g</span><b>{formatMoney(item.grindingCostPer600gCents)}</b></p>
+                  <p><span>Grinding / 斤</span><b>{formatMoney(item.grindingCostPer600gCents)}</b></p>
                   <p><span>70% deposit</span><b>{formatMoney(item.depositCents)}</b></p>
-                  <p><span>30% collection balance</span><b>{formatMoney(item.balanceCents)}</b></p>
+                  <p><span>{order.depositRequired ? "30% collection balance" : "collection balance"}</span><b>{formatMoney(item.balanceCents)}</b></p>
                 </div>
               )}
             </div>
           ))}
           <p><span>商品小计</span><strong>{formatMoney(order.subtotalCents)}</strong></p>
-          <p><span>GST 9%</span><strong>{formatMoney(order.gstCents)}</strong></p>
+          <p><span>GST {order.gstRate ?? 0}%</span><strong>{formatMoney(order.gstCents)}</strong></p>
           <p><span>运输费</span><strong>{order.deliveryFeeCents == null ? "另计" : formatMoney(order.deliveryFeeCents)}</strong></p>
           <p><span>最终金额</span><strong>{order.finalTotalCents == null ? "待确认" : formatMoney(order.finalTotalCents)}</strong></p>
         </div>
@@ -158,9 +325,39 @@ export default function AdminOrderDetailPage() {
         <div className="checkout-form">
           <h2>状态与金额</h2>
           <label>
+            Bill To 客户
+            <select value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
+              <option value="">使用订单填写资料</option>
+              {customers
+                .filter((customer) => customer.active || customer.id === customerId)
+                .map((customer) => (
+                  <option value={customer.id} key={customer.id}>
+                    {customer.nameZh}{customer.nameEn ? ` / ${customer.nameEn}` : ""}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <label>
             订单状态
             <select value={order.status} onChange={(event) => update({ status: event.target.value })}>
               {statuses.map((status) => <option key={status}>{status}</option>)}
+            </select>
+          </label>
+          <label>
+            GST
+            <select value={gstRate} onChange={(event) => setGstRate(Number(event.target.value) as 0 | 9)}>
+              <option value={0}>0% - Non GST registered / waived</option>
+              <option value={9}>9%</option>
+            </select>
+          </label>
+          <label>
+            Custom Blend deposit
+            <select
+              value={depositRequired ? "new" : "repeat"}
+              onChange={(event) => setDepositRequired(event.target.value === "new")}
+            >
+              <option value="new">New customer: 70% deposit</option>
+              <option value="repeat">Repeat customer: deposit waived</option>
             </select>
           </label>
           <label>
@@ -178,11 +375,22 @@ export default function AdminOrderDetailPage() {
               update({
                 deliveryFeeCents: deliveryFee ? Math.round(Number(deliveryFee) * 100) : null,
                 finalTotalCents: finalTotal ? Math.round(Number(finalTotal) * 100) : null,
+                customerId: customerId || null,
+                gstRate,
+                depositRequired,
               })
             }
           >
             保存金额
           </button>
+          <Link className="cart-link" href={`/admin/orders/${order.id}/cash-sale`} target="_blank">
+            生成沽单
+          </Link>
+          {order.status === "cancelled" && (
+            <button className="danger-button" type="button" onClick={deleteCancelledOrder}>
+              删除取消订单
+            </button>
+          )}
         </div>
 
         <div className="summary-box">

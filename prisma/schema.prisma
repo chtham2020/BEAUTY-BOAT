@@ -24,6 +24,22 @@ model Product {
   orderItems  OrderItem[]
 }
 
+model Customer {
+  id           String   @id @default(cuid())
+  nameZh       String
+  nameEn       String?
+  addressLine1 String?
+  addressLine2 String?
+  postalCode   String?
+  phone        String?
+  email        String?
+  notes        String?
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  orders       Order[]
+}
+
 model Order {
   id               String      @id @default(cuid())
   orderNumber      String      @unique
@@ -34,14 +50,18 @@ model Order {
   deliveryNote     String?
   status           String      @default("pending")
   subtotalCents    Int         @default(0)
+  gstRate          Int         @default(0)
   gstCents         Int         @default(0)
   deliveryFeeCents Int?
   finalTotalCents  Int?
   hasQuoteItems    Boolean     @default(false)
+  depositRequired  Boolean     @default(true)
   followUpText     String
+  customerId       String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   items            OrderItem[]
+  billToCustomer   Customer?   @relation(fields: [customerId], references: [id], onDelete: SetNull)
 }
 
 model OrderItem {
@@ -51,7 +71,7 @@ model OrderItem {
   productNameZh  String
   productNameEn  String
   unit           String
-  quantity       Int
+  quantity       Float
   unitPriceCents Int?
   lineTotalCents Int?
   quoteOnly      Boolean  @default(false)
@@ -63,7 +83,7 @@ model OrderItem {
   heatTreatment  String?
   processSpec    String?
   grindingCostPer600gCents Int?
-  minimumQuantityKg Int?
+  minimumQuantityKg Float?
   depositCents   Int?
   balanceCents   Int?
   order          Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)

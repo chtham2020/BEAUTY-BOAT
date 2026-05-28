@@ -35,10 +35,24 @@
 ## Hermes First Version
 - Use the low-cash-spend Hermes setup: Next.js built-in backend, Prisma, and local SQLite.
 - Do not connect Lalamove/Grab APIs, WhatsApp API, Stripe, HitPay, or automatic PayNow verification in v1.
-- Cart and checkout must show GST 9%.
+- Checkout and admin orders must allow GST 0% or 9%; default can be 0% while the company is non-GST registered.
+- Custom Blend deposit should be required for new customers, but can be waived for repeat orders.
 - Delivery fee is quoted separately for Lalamove/Grab and manually confirmed by the shop.
 - Self pickup can have zero delivery fee, but pickup time still needs shop confirmation.
 - Shop follows up orders by manually opening WhatsApp text links or phone links.
+
+## Hermes Customer And Invoice Rules
+- Hermes should keep a customer list in the database for repeat orders and Bill To details.
+- Cash sale / invoice documents must show the FOOK ON / 福安 logo and company details.
+- Invoice format should follow the existing FOOK ON cash sale style: Bill To, date, invoice number, bilingual item table, total, and customer signature area.
+- Invoice line net weight may use 「斤」; 1 斤 means 600g.
+- PDF creation can begin as a printable HTML/document view that the shop can print or save as PDF, keeping cash spend low.
+
+## Custom Blend Rules
+- Customer-supplied custom blends should support ingredient lines with ingredient name/type and quantity in 「斤」.
+- The system should show a total weight row in 「斤」 for the whole package before calculating grinding charge.
+- Use 1 斤 = 600g. Grinding charge can be stored/displayed as cost per 斤.
+- Customer copy examples such as 王祥顺 may show whole-package totals like 20.5斤; Hermes must support decimal quantities such as 20.5.
 
 ## Hermes AI Experiment
 - AI features live only in the `codex/hermes-ai-assistant` worktree until merged.

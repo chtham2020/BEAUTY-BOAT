@@ -3,7 +3,7 @@
 import { calculateGst, formatMoney } from "@/lib/money";
 import type { CartItem, CartStoredItem, PublicProduct } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
-import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, customCartKey } from "@/lib/custom-pricing";
+import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, customCartKey, getCustomBlendWeightJin } from "@/lib/custom-pricing";
 import { House } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -31,6 +31,7 @@ const copy = {
     heatTreatment: "Heat treatment",
     processSpec: "Baking / grinding spec",
     minimumQuantity: "Minimum quantity",
+    totalWeight: "总重量",
     grindingCost: "Grinding cost",
     deposit: "70% deposit",
     balance: "30% upon collection",
@@ -57,6 +58,7 @@ const copy = {
     heatTreatment: "Heat Treatment",
     processSpec: "Baking / Grinding Spec",
     minimumQuantity: "Minimum Quantity",
+    totalWeight: "Total Weight",
     grindingCost: "Grinding Cost",
     deposit: "70% Deposit",
     balance: "30% Upon Collection",
@@ -102,7 +104,9 @@ export default function CartPage() {
 
   function updateQuantity(itemKey: string, quantity: number) {
     const current = items.find((item) => customCartKey(item.productId, item.customQuote?.vendorCode) === itemKey);
-    const minimum = current?.customQuote?.minimumQuantityKg ?? 1;
+    const minimum = current?.customQuote
+      ? getCustomBlendWeightJin(current.customQuote.minimumQuantityJin ?? current.customQuote.minimumQuantityKg, current.customQuote)
+      : 1;
     const next = items
       .map((item) =>
         customCartKey(item.productId, item.customQuote?.vendorCode) === itemKey
@@ -176,16 +180,35 @@ export default function CartPage() {
                   <div className="custom-cart-details">
                     <p><span>{t.vendorCode}</span><b>{item.customQuote.vendorCode} · {item.customQuote.vendorName}</b></p>
                     <p><span>{t.ingredients}</span><b>{item.customQuote.ingredients.join(", ")}</b></p>
+                    {item.customQuote.ingredientLines && (
+                      <div className="ingredient-line-table">
+                        {item.customQuote.ingredientLines.map((ingredient) => (
+                          <p key={ingredient.name}>
+                            <span>{ingredient.name}</span>
+                            <b>
+                              {ingredient.quantityJin}斤
+                              {ingredient.unitPriceCents != null && ` × ${formatMoney(ingredient.unitPriceCents)}`}
+                              {ingredient.lineTotalCents != null && ` = ${formatMoney(ingredient.lineTotalCents)}`}
+                            </b>
+                          </p>
+                        ))}
+                        <p className="ingredient-total-row">
+                          <span>{t.totalWeight}</span>
+                          <b>{getCustomBlendWeightJin(item.quantity, item.customQuote)}斤</b>
+                        </p>
+                      </div>
+                    )}
                     <p><span>{t.heatTreatment}</span><b>{item.customQuote.heatTreatment}</b></p>
                     <p><span>{t.processSpec}</span><b>{item.customQuote.processSpec}</b></p>
-                    <p><span>{t.minimumQuantity}</span><b>{item.customQuote.minimumQuantityKg}kg</b></p>
-                    <p><span>{t.grindingCost}</span><b>{formatMoney(item.customQuote.grindingCostPer600gCents)} / 600g</b></p>
+                    <p><span>{t.minimumQuantity}</span><b>{getCustomBlendWeightJin(item.quantity, item.customQuote)}斤</b></p>
+                    <p><span>{t.grindingCost}</span><b>{formatMoney(item.customQuote.grindingCostPerJinCents ?? item.customQuote.grindingCostPer600gCents)} / 斤</b></p>
                   </div>
                 )}
               </div>
               <input
                 type="number"
-                min={item.customQuote?.minimumQuantityKg ?? 1}
+                min={item.customQuote ? getCustomBlendWeightJin(item.quantity, item.customQuote) : 1}
+                step={item.customQuote ? 0.5 : 1}
                 value={item.quantity}
                 onChange={(event) =>
                   updateQuantity(customCartKey(item.productId, item.customQuote?.vendorCode), Number(event.target.value))

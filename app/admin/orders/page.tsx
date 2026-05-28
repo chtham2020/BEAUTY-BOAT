@@ -22,15 +22,30 @@ type AdminOrder = {
 export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<AdminOrder[]>([]);
 
+  async function load() {
+    const response = await fetch("/api/admin/orders");
+    if (response.status === 401) {
+      window.location.href = "/admin/login";
+      return;
+    }
+    setOrders(await response.json());
+  }
+
   useEffect(() => {
-    fetch("/api/admin/orders").then(async (response) => {
-      if (response.status === 401) {
-        window.location.href = "/admin/login";
-        return;
-      }
-      setOrders(await response.json());
-    });
+    load();
   }, []);
+
+  async function deleteCancelledOrder(order: AdminOrder) {
+    const ok = window.confirm(`Delete cancelled order ${order.orderNumber} permanently?`);
+    if (!ok) return;
+    const response = await fetch(`/api/admin/orders/${order.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      window.alert(data?.error || "Order delete failed");
+      return;
+    }
+    load();
+  }
 
   return (
     <main className="shop-page">
@@ -39,12 +54,16 @@ export default function AdminOrdersPage() {
           <p className="eyebrow">Hermes Admin</p>
           <h1>订单管理</h1>
         </div>
-        <Link className="cart-link" href="/admin/products">产品库存</Link>
+        <div className="shop-actions">
+          <Link className="cart-link" href="/admin/customers">客户资料</Link>
+          <Link className="cart-link" href="/admin/products">产品库存</Link>
+        </div>
       </header>
 
       <section className="admin-list">
         {orders.map((order) => (
-          <Link className="admin-row" href={`/admin/orders/${order.id}`} key={order.id}>
+          <article className="admin-row" key={order.id}>
+          <Link className="admin-row-main" href={`/admin/orders/${order.id}`}>
             <div>
               <h2>{order.orderNumber}</h2>
               <p>{order.customerName} · {order.customerPhone}</p>
@@ -53,6 +72,12 @@ export default function AdminOrdersPage() {
             <strong>{order.status}</strong>
             <span>{order.hasQuoteItems ? "待确认" : formatMoney(order.finalTotalCents ?? order.subtotalCents + order.gstCents)}</span>
           </Link>
+          {order.status === "cancelled" && (
+            <button className="danger-button" type="button" onClick={() => deleteCancelledOrder(order)}>
+              删除
+            </button>
+          )}
+          </article>
         ))}
       </section>
     </main>

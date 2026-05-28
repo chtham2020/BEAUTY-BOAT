@@ -13,6 +13,7 @@ export function makeFollowUpText(input: {
   customerName: string;
   subtotalCents: number;
   gstCents: number;
+  gstRate: 0 | 9;
   hasQuoteItems: boolean;
   deliveryMethod: string;
   finalTotalCents?: number | null;
@@ -25,7 +26,7 @@ export function makeFollowUpText(input: {
     `您好 ${input.customerName}，这里是福安，BEAUTY BOAT 美人舟品牌。`,
     `我们已收到订单 ${input.orderNumber}。`,
     `商品小计：${formatMoney(input.subtotalCents)}`,
-    `GST 9%：${formatMoney(input.gstCents)}`,
+    `GST ${input.gstRate}%: ${formatMoney(input.gstCents)}`,
     `运输方式：${input.deliveryMethod}`,
     `总额：${totalLabel}`,
     "运输费/取货时间将由店家确认后再通知。",

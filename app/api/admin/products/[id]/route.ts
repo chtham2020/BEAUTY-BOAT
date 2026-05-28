@@ -22,9 +22,26 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = productSchema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid product" }, { status: 400 });
 
+  const current = await prisma.product.findUnique({ where: { id } });
+  if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  if (parsed.data.stock !== undefined && Math.abs(parsed.data.stock - current.stock) !== 1) {
+    return NextResponse.json({ error: "Stock can only be increased or decreased by one" }, { status: 409 });
+  }
+
   const product = await prisma.product.update({
     where: { id },
     data: parsed.data,
   });
   return NextResponse.json(product);
+}
+
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+  await requireAdmin();
+  const { id } = await params;
+  const product = await prisma.product.findUnique({ where: { id } });
+  if (!product) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  await prisma.product.delete({ where: { id } });
+  return NextResponse.json({ ok: true });
 }
