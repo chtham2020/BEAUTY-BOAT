@@ -17,6 +17,32 @@ function withTotalWeight(quote: CustomQuoteSnapshot): CustomQuoteSnapshot {
 }
 
 const vendorQuotes: Record<string, CustomQuoteSnapshot> = {
+  "YJ-21": withTotalWeight({
+    vendorCode: "YJ-21",
+    vendorName: "YJ Repeat Customer",
+    blendType: "Repeat customer custom blend",
+    ingredients: ["八角", "桂皮", "沙姜", "花椒", "丁香", "小茴", "甘草", "归头"],
+    ingredientLines: [
+      { name: "八角", quantityJin: 2, unitPriceCents: 1000, lineTotalCents: 2000 },
+      { name: "桂皮", quantityJin: 3, unitPriceCents: 720, lineTotalCents: 2160 },
+      { name: "沙姜", quantityJin: 3, unitPriceCents: 1500, lineTotalCents: 4500 },
+      { name: "花椒", quantityJin: 3, unitPriceCents: 1150, lineTotalCents: 3450 },
+      { name: "丁香", quantityJin: 1, unitPriceCents: 1100, lineTotalCents: 1100 },
+      { name: "小茴", quantityJin: 2, unitPriceCents: 240, lineTotalCents: 480 },
+      { name: "甘草", quantityJin: 3, unitPriceCents: 1000, lineTotalCents: 3000 },
+      { name: "归头", quantityJin: 4, unitPriceCents: 5000, lineTotalCents: 20000 },
+    ],
+    ingredientQuantity: "21斤 total blend, 1斤 = 600g",
+    unit: "斤",
+    heatTreatment: "Repeat customer supplied blend; confirm any baking/heat treatment before grinding",
+    processSpec: "Fine grinding charge applies on total finished mixture weight",
+    grindingCostPer600gCents: 350,
+    grindingCostPerJinCents: 350,
+    minimumQuantityKg: 21,
+    minimumQuantityJin: 21,
+    totalWeightJin: 21,
+    unitPriceCents: 0,
+  }),
   "WSS-20.5": withTotalWeight({
     vendorCode: "WSS-20.5",
     vendorName: "王祥顺",
