@@ -17,6 +17,30 @@ function withTotalWeight(quote: CustomQuoteSnapshot): CustomQuoteSnapshot {
 }
 
 const vendorQuotes: Record<string, CustomQuoteSnapshot> = {
+  "HLW-15": withTotalWeight({
+    vendorCode: "HLW-15",
+    vendorName: "HLW Repeat Customer",
+    blendType: "Repeat customer custom blend",
+    ingredients: ["八角", "桂皮", "芫荽子", "花椒", "丁香", "甘草"],
+    ingredientLines: [
+      { name: "八角", quantityJin: 3, unitPriceCents: 1000, lineTotalCents: 3000 },
+      { name: "桂皮", quantityJin: 3, unitPriceCents: 800, lineTotalCents: 2400 },
+      { name: "芫荽子", quantityJin: 3, unitPriceCents: 240, lineTotalCents: 720 },
+      { name: "花椒", quantityJin: 3, unitPriceCents: 1170, lineTotalCents: 3510 },
+      { name: "丁香", quantityJin: 1, unitPriceCents: 1180, lineTotalCents: 1180 },
+      { name: "甘草", quantityJin: 2, unitPriceCents: 1000, lineTotalCents: 2000 },
+    ],
+    ingredientQuantity: "15斤 total blend, 1斤 = 600g",
+    unit: "斤",
+    heatTreatment: "Repeat customer supplied blend; confirm any baking/heat treatment before grinding",
+    processSpec: "Fine grinding charge applies on total finished mixture weight",
+    grindingCostPer600gCents: 400,
+    grindingCostPerJinCents: 400,
+    minimumQuantityKg: 15,
+    minimumQuantityJin: 15,
+    totalWeightJin: 15,
+    unitPriceCents: 0,
+  }),
   "YJ-21": withTotalWeight({
     vendorCode: "YJ-21",
     vendorName: "YJ Repeat Customer",
