@@ -1,4 +1,5 @@
 import { OrderSuccessClient } from "./OrderSuccessClient";
+import { MobileBottomTabs } from "../../MobileBottomTabs";
 
 export default async function OrderSuccessPage({
   searchParams,
@@ -10,6 +11,7 @@ export default async function OrderSuccessPage({
   return (
     <main className="shop-page narrow">
       <OrderSuccessClient order={params.order} />
+      <MobileBottomTabs active="checkout" />
     </main>
   );
 }

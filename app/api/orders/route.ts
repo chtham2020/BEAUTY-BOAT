@@ -87,37 +87,39 @@ export async function POST(request: Request) {
   }
 
   try {
-    const lines = await Promise.all(parsed.data.items.map(async (item) => {
-      const product = productMap.get(item.productId);
-      if (!product) {
-        throw new Error("PRODUCT_NOT_FOUND");
-      }
-      const customQuote =
-        product.id === CUSTOM_BLEND_PRODUCT_ID && item.customQuote?.vendorCode
-          ? await getVendorQuoteFromDb(item.customQuote.vendorCode)
-          : null;
-      const customRecipe = product.id === CUSTOM_BLEND_PRODUCT_ID ? item.customRecipe : undefined;
+    const lines = await Promise.all(
+      parsed.data.items.map(async (item) => {
+        const product = productMap.get(item.productId);
+        if (!product) {
+          throw new Error("PRODUCT_NOT_FOUND");
+        }
+        const customQuote =
+          product.id === CUSTOM_BLEND_PRODUCT_ID && item.customQuote?.vendorCode
+            ? await getVendorQuoteFromDb(item.customQuote.vendorCode)
+            : null;
+        const customRecipe = product.id === CUSTOM_BLEND_PRODUCT_ID ? item.customRecipe : undefined;
 
-      if (product.id === CUSTOM_BLEND_PRODUCT_ID && !customQuote && !customRecipe) {
-        throw new Error("VENDOR_CODE_REQUIRED");
-      }
-      if (customRecipe) {
-        const totalWeightJin = customRecipe.ingredientLines.reduce((sum, ingredient) => sum + ingredient.quantityJin, 0);
-        if (totalWeightJin < CUSTOM_BLEND_MINIMUM_JIN) {
+        if (product.id === CUSTOM_BLEND_PRODUCT_ID && !customQuote && !customRecipe) {
+          throw new Error("VENDOR_CODE_REQUIRED");
+        }
+        if (customRecipe) {
+          const totalWeightJin = customRecipe.ingredientLines.reduce((sum, ingredient) => sum + ingredient.quantityJin, 0);
+          if (totalWeightJin < CUSTOM_BLEND_MINIMUM_JIN) {
+            throw new Error("MINIMUM_QUANTITY");
+          }
+          if (Math.abs(totalWeightJin - customRecipe.totalWeightJin) > 0.001) {
+            throw new Error("INVALID_RECIPE_WEIGHT");
+          }
+        }
+        if (customQuote && item.quantity < getCustomBlendWeightJin(customQuote.minimumQuantityJin ?? customQuote.minimumQuantityKg, customQuote)) {
           throw new Error("MINIMUM_QUANTITY");
         }
-        if (Math.abs(totalWeightJin - customRecipe.totalWeightJin) > 0.001) {
-          throw new Error("INVALID_RECIPE_WEIGHT");
+        if (!product.quoteOnly && product.stock < item.quantity) {
+          throw new Error("INSUFFICIENT_STOCK");
         }
-      }
-      if (customQuote && item.quantity < getCustomBlendWeightJin(customQuote.minimumQuantityJin ?? customQuote.minimumQuantityKg, customQuote)) {
-        throw new Error("MINIMUM_QUANTITY");
-      }
-      if (!product.quoteOnly && product.stock < item.quantity) {
-        throw new Error("INSUFFICIENT_STOCK");
-      }
-      return { ...item, product, customQuote, customRecipe };
-    }));
+        return { ...item, product, customQuote, customRecipe };
+      }),
+    );
 
     const subtotalCents = lines.reduce((sum, line) => {
       if (line.customQuote) return sum + calculateCustomLineTotalCents(line.quantity, line.customQuote);
@@ -127,11 +129,12 @@ export async function POST(request: Request) {
     const hasQuoteItems = lines.some(
       (line) => Boolean(line.customRecipe) || (!line.customQuote && (line.product.quoteOnly || line.product.priceCents == null)),
     );
+    const hasCustomBlendItems = lines.some((line) => line.customQuote || line.customRecipe);
+    const depositRequired = customRecipeItems.length > 0 ? true : hasCustomBlendItems ? parsed.data.depositRequired : false;
     const gstCents = calculateGstWithRate(subtotalCents, parsed.data.gstRate);
     const finalTotalCents = hasQuoteItems ? null : subtotalCents + gstCents;
     const orderNumber = makeOrderNumber();
-    const deliveryLabel =
-      parsed.data.deliveryMethod === "self-pickup" ? "Self pickup" : "Lalamove / Grab delivery";
+    const deliveryLabel = parsed.data.deliveryMethod === "self-pickup" ? "Self pickup" : "Lalamove / Grab delivery";
     const followUpText = makeFollowUpText({
       orderNumber,
       customerName: parsed.data.customerName,
@@ -157,13 +160,11 @@ export async function POST(request: Request) {
         finalTotalCents,
         deliveryFeeCents: parsed.data.deliveryMethod === "self-pickup" ? 0 : null,
         hasQuoteItems,
-        depositRequired: customRecipeItems.length > 0 ? true : parsed.data.depositRequired,
+        depositRequired,
         followUpText,
         items: {
           create: lines.map((line) => {
-            const customLineTotal = line.customQuote
-              ? calculateCustomLineTotalCents(line.quantity, line.customQuote)
-              : null;
+            const customLineTotal = line.customQuote ? calculateCustomLineTotalCents(line.quantity, line.customQuote) : null;
             return {
               productId: line.product.id,
               productNameZh: line.product.nameZh,
@@ -212,11 +213,13 @@ export async function POST(request: Request) {
                 : line.customRecipe
                   ? line.customRecipe.totalWeightJin
                   : undefined,
-              depositCents: line.customQuote && parsed.data.depositRequired && customLineTotal != null
-                ? calculateDepositCents(customLineTotal)
-                : line.customQuote ? 0 : undefined,
+              depositCents: line.customQuote && customLineTotal != null
+                ? depositRequired
+                  ? calculateDepositCents(customLineTotal)
+                  : 0
+                : undefined,
               balanceCents: line.customQuote && customLineTotal != null
-                ? parsed.data.depositRequired
+                ? depositRequired
                   ? calculateBalanceCents(customLineTotal)
                   : customLineTotal
                 : undefined,

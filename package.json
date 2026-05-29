@@ -7,11 +7,17 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "android:sync": "cap sync android",
+    "android:open": "cap open android",
+    "android:build:apk": "cd android && gradlew.bat assembleDebug",
+    "android:build:aab": "cd android && gradlew.bat bundleRelease",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
+    "@capacitor/android": "^8.3.4",
+    "@capacitor/core": "^8.3.4",
     "@prisma/client": "^6.19.0",
     "jose": "^6.2.3",
     "lucide-react": "0.468.0",
@@ -22,6 +28,7 @@
     "zod": "^4.4.3"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.3.4",
     "@types/node": "22.10.2",
     "@types/react": "19.0.2",
     "@types/react-dom": "19.0.2",

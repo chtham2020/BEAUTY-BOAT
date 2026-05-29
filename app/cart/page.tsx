@@ -11,9 +11,10 @@ import {
   customCartKey,
   getCustomBlendWeightJin,
 } from "@/lib/custom-pricing";
-import { House } from "lucide-react";
+import { House, Minus, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
+import { MobileBottomTabs } from "../MobileBottomTabs";
 
 const CART_KEY = "beauty_boat_cart";
 
@@ -188,6 +189,12 @@ export default function CartPage() {
           {items.length === 0 && <p>{t.empty}</p>}
           {items.map((item) => {
             const itemKey = customCartKey(item.productId, item.customQuote?.vendorCode, item.customRecipe?.recipeId);
+            const minimum = item.customQuote
+              ? getCustomBlendWeightJin(item.customQuote.minimumQuantityJin ?? item.customQuote.minimumQuantityKg, item.customQuote)
+              : item.customRecipe
+                ? item.customRecipe.totalWeightJin
+                : 1;
+            const step = item.customQuote || item.customRecipe ? 0.5 : 1;
             return (
               <article className="cart-line" key={itemKey}>
                 <div>
@@ -251,15 +258,34 @@ export default function CartPage() {
                     </div>
                   )}
                 </div>
-                <input
-                  type="number"
-                  min={item.customQuote ? getCustomBlendWeightJin(item.quantity, item.customQuote) : item.customRecipe ? item.customRecipe.totalWeightJin : 1}
-                  step={item.customQuote || item.customRecipe ? 0.5 : 1}
-                  value={item.quantity}
-                  disabled={Boolean(item.customRecipe)}
-                  onChange={(event) => updateQuantity(itemKey, Number(event.target.value))}
-                />
-                <button type="button" onClick={() => remove(itemKey)}>
+                <div className="quantity-stepper" aria-label="Quantity controls">
+                  <button
+                    type="button"
+                    aria-label="Decrease quantity"
+                    disabled={Boolean(item.customRecipe) || item.quantity <= minimum}
+                    onClick={() => updateQuantity(itemKey, item.quantity - step)}
+                  >
+                    <Minus size={16} />
+                  </button>
+                  <input
+                    type="number"
+                    min={minimum}
+                    step={step}
+                    value={item.quantity}
+                    disabled={Boolean(item.customRecipe)}
+                    onChange={(event) => updateQuantity(itemKey, Number(event.target.value))}
+                  />
+                  <button
+                    type="button"
+                    aria-label="Increase quantity"
+                    disabled={Boolean(item.customRecipe)}
+                    onClick={() => updateQuantity(itemKey, item.quantity + step)}
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+                <button className="remove-line-button" type="button" onClick={() => remove(itemKey)}>
+                  <Trash2 size={16} aria-hidden="true" />
                   {t.remove}
                 </button>
               </article>
@@ -284,6 +310,7 @@ export default function CartPage() {
           </Link>
         </aside>
       </section>
+      <MobileBottomTabs active="cart" />
     </main>
   );
 }

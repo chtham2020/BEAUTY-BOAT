@@ -13,6 +13,7 @@ import { House } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { MobileBottomTabs } from "../MobileBottomTabs";
 
 const CART_KEY = "beauty_boat_cart";
 
@@ -104,6 +105,7 @@ export default function CheckoutPage() {
       hasNewRecipe: hasNewCustomRecipe(cartItems),
     };
   }, [cartItems, depositRequired]);
+  const hasCustomBlend = customTotals.customSubtotal > 0 || customTotals.hasNewRecipe;
 
   async function submit(formData: FormData) {
     setError("");
@@ -115,6 +117,7 @@ export default function CheckoutPage() {
       return;
     }
 
+    const orderDepositRequired = customTotals.hasNewRecipe ? true : hasCustomBlend ? depositRequired : false;
     const response = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -125,7 +128,7 @@ export default function CheckoutPage() {
         deliveryNote: formData.get("deliveryNote"),
         customerNote: formData.get("customerNote"),
         gstRate,
-        depositRequired: customTotals.hasNewRecipe ? true : depositRequired,
+        depositRequired: orderDepositRequired,
         items,
       }),
     });
@@ -156,7 +159,7 @@ export default function CheckoutPage() {
         </Link>
       </header>
 
-      <form className="checkout-form" action={submit}>
+      <form className="checkout-form mobile-sticky-form" action={submit}>
         <label>
           {t.name}
           <input name="customerName" required />
@@ -170,7 +173,7 @@ export default function CheckoutPage() {
           <select name="deliveryMethod" required defaultValue="third-party">
             {DELIVERY_METHODS.map((method) => (
               <option key={method.value} value={method.value}>
-                {language === "en" ? method.en : `${method.zh} / ${method.en}`}
+                {language === "en" ? method.en : method.zh}
               </option>
             ))}
           </select>
@@ -182,17 +185,19 @@ export default function CheckoutPage() {
             <option value={9}>9%</option>
           </select>
         </label>
-        <label>
-          Custom Blend deposit
-          <select
-            value={depositRequired ? "new" : "repeat"}
-            onChange={(event) => setDepositRequired(event.target.value === "new")}
-            disabled={customTotals.hasNewRecipe}
-          >
-            <option value="new">New customer: 70% deposit</option>
-            <option value="repeat">Repeat customer: deposit waived</option>
-          </select>
-        </label>
+        {hasCustomBlend && (
+          <label>
+            Custom Blend customer type
+            <select
+              value={depositRequired ? "new" : "repeat"}
+              onChange={(event) => setDepositRequired(event.target.value === "new")}
+              disabled={customTotals.hasNewRecipe}
+            >
+              <option value="new">New customer: 70% deposit applies</option>
+              <option value="repeat">Repeat order: deposit waived</option>
+            </select>
+          </label>
+        )}
         <label>
           {t.deliveryNote}
           <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} required={customTotals.hasNewRecipe} />
@@ -215,10 +220,11 @@ export default function CheckoutPage() {
           <p><span>{t.payment}</span><strong>{t.paymentValue}</strong></p>
         </div>
         {error && <p className="form-error">{error}</p>}
-        <button className="checkout-button" type="submit" disabled={loading}>
+        <button className="checkout-button mobile-sticky-submit" type="submit" disabled={loading}>
           {loading ? t.submitting : t.submit}
         </button>
       </form>
+      <MobileBottomTabs active="checkout" />
     </main>
   );
 }

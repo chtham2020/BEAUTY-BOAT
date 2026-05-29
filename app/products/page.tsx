@@ -14,6 +14,7 @@ import {
 } from "@/lib/custom-pricing";
 import type { CartStoredItem, CustomQuoteSnapshot, CustomRecipeSnapshot, PublicProduct } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
+import { MobileBottomTabs } from "../MobileBottomTabs";
 import { Check, House, Plus, ShoppingCart, Square, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -319,7 +320,10 @@ export default function ProductsPage() {
           const sampleLineTotal = quote ? calculateCustomLineTotalCents(quote.minimumQuantityKg, quote) : 0;
 
           return (
-            <article className={`shop-card${isSelected ? " is-in-cart" : ""}`} key={product.id}>
+            <article
+              className={`shop-card${product.image ? " has-product-image" : ""}${isCustomBlend ? " is-custom-blend" : ""}${isSelected ? " is-in-cart" : ""}`}
+              key={product.id}
+            >
               {product.image && <img src={product.image} alt={product.nameZh} />}
               <div>
                 {isSelected && (
@@ -534,6 +538,7 @@ export default function ProductsPage() {
           );
         })}
       </section>
+      <MobileBottomTabs active="products" />
     </main>
   );
 }

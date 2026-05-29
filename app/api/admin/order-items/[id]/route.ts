@@ -15,6 +15,7 @@ const ingredientLineSchema = z.object({
   name: z.string().min(1),
   quantityJin: z.number().min(0.01),
   unitPriceCents: z.number().int().min(0),
+  lineTotalCents: z.number().int().min(0).optional(),
 });
 
 const schema = z.object({
@@ -43,7 +44,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
 
   const ingredientLines = parsed.data.ingredientLines.map((line) => ({
     ...line,
-    lineTotalCents: calculateIngredientLineTotalCents(line.quantityJin, line.unitPriceCents),
+    lineTotalCents: line.lineTotalCents ?? calculateIngredientLineTotalCents(line.quantityJin, line.unitPriceCents),
   }));
   const totalWeightJin = ingredientWeightTotalJin(ingredientLines);
   const ingredientsTotalCents = ingredientSubtotalCents(ingredientLines);

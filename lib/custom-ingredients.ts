@@ -44,10 +44,12 @@ export function parseIngredientLines(value: string | null | undefined): Ingredie
     .filter((line): line is IngredientPriceLine => line != null);
 }
 
-export function formatIngredientLines(lines: { name: string; quantityJin: number; unitPriceCents: number }[]) {
+export function formatIngredientLines(
+  lines: { name: string; quantityJin: number; unitPriceCents: number; lineTotalCents?: number }[],
+) {
   return lines
     .map((line) => {
-      const lineTotalCents = calculateIngredientLineTotalCents(line.quantityJin, line.unitPriceCents);
+      const lineTotalCents = line.lineTotalCents ?? calculateIngredientLineTotalCents(line.quantityJin, line.unitPriceCents);
       return `${line.name} ${line.quantityJin}斤 @ $${(line.unitPriceCents / 100).toFixed(2)} = $${(lineTotalCents / 100).toFixed(2)}`;
     })
     .join("; ");

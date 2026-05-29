@@ -60,6 +60,7 @@ type IngredientDraftLine = {
   name: string;
   quantityJin: number;
   unitPrice: string;
+  lineTotal: string;
 };
 
 type CustomBlendDraft = {
@@ -73,6 +74,29 @@ const aiDraftKinds = [
   { kind: "summary", label: "订单摘要" },
   { kind: "quote", label: "报价/供应商询价" },
 ] as const;
+
+function makeIngredientDraftLines(item: OrderDetail["items"][number]): IngredientDraftLine[] {
+  const parsedLines = parseIngredientLines(item.ingredients);
+  if (parsedLines.length > 0) {
+    return parsedLines.map((line: IngredientPriceLine) => ({
+      name: line.name,
+      quantityJin: line.quantityJin,
+      unitPrice: String(line.unitPriceCents / 100),
+      lineTotal: String(line.lineTotalCents / 100),
+    }));
+  }
+
+  return (item.ingredients ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean)
+    .map((name) => ({
+      name,
+      quantityJin: 1,
+      unitPrice: "0",
+      lineTotal: "0",
+    }));
+}
 
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
@@ -111,11 +135,7 @@ export default function AdminOrderDetailPage() {
           .map((item: OrderDetail["items"][number]) => [
             item.id,
             {
-              lines: parseIngredientLines(item.ingredients).map((line: IngredientPriceLine) => ({
-                name: line.name,
-                quantityJin: line.quantityJin,
-                unitPrice: String(line.unitPriceCents / 100),
-              })),
+              lines: makeIngredientDraftLines(item),
               grindingCostPerJin: item.grindingCostPer600gCents == null ? "" : String(item.grindingCostPer600gCents / 100),
             },
           ]),
@@ -163,8 +183,34 @@ export default function AdminOrderDetailPage() {
     setCustomBlendDrafts((current) => {
       const draft = current[itemId];
       if (!draft) return current;
-      const lines = draft.lines.map((line, lineIndex) => (lineIndex === index ? { ...line, ...data } : line));
+      const lines = draft.lines.map((line, lineIndex) => {
+        if (lineIndex !== index) return line;
+        const next = { ...line, ...data };
+        if (data.quantityJin !== undefined || data.unitPrice !== undefined) {
+          const amount = Number(next.quantityJin || 0) * Number(next.unitPrice || 0);
+          next.lineTotal = Number.isFinite(amount) ? amount.toFixed(2) : "0";
+        }
+        if (data.lineTotal !== undefined && Number(next.quantityJin) > 0) {
+          const unitPrice = Number(next.lineTotal || 0) / Number(next.quantityJin);
+          next.unitPrice = Number.isFinite(unitPrice) ? unitPrice.toFixed(2) : "0";
+        }
+        return next;
+      });
       return { ...current, [itemId]: { ...draft, lines } };
+    });
+  }
+
+  function addIngredientDraftLine(itemId: string) {
+    setCustomBlendDrafts((current) => {
+      const draft = current[itemId];
+      if (!draft) return current;
+      return {
+        ...current,
+        [itemId]: {
+          ...draft,
+          lines: [...draft.lines, { name: "", quantityJin: 1, unitPrice: "0", lineTotal: "0" }],
+        },
+      };
     });
   }
 
@@ -180,6 +226,7 @@ export default function AdminOrderDetailPage() {
           name: line.name,
           quantityJin: Number(line.quantityJin),
           unitPriceCents: Math.round(Number(line.unitPrice || 0) * 100),
+          lineTotalCents: Math.round(Number(line.lineTotal || 0) * 100),
         })),
         grindingCostPerJinCents: Math.round(Number(draft.grindingCostPerJin || 0) * 100),
       }),
@@ -265,16 +312,15 @@ export default function AdminOrderDetailPage() {
                 <div className="custom-cart-details">
                   <p><span>Vendor code</span><b>{item.vendorCode ?? "New customer recipe"} · {item.vendorName}</b></p>
                   <p><span>Blend type</span><b>{item.blendType}</b></p>
-                  {customBlendDrafts[item.id]?.lines.length > 0 && (
+                  {customBlendDrafts[item.id] && (
                     <div className="admin-ingredient-editor">
                       <div className="admin-ingredient-header">
                         <span>Ingredient</span>
                         <span>Qty 斤</span>
                         <span>Unit $</span>
-                        <span>Amount</span>
+                        <span>Line $</span>
                       </div>
                       {customBlendDrafts[item.id].lines.map((line, index) => {
-                        const amount = Number(line.quantityJin) * Number(line.unitPrice || 0);
                         return (
                           <div className="admin-ingredient-row" key={`${item.id}-${line.name}-${index}`}>
                             <input
@@ -295,7 +341,13 @@ export default function AdminOrderDetailPage() {
                               value={line.unitPrice}
                               onChange={(event) => updateIngredientDraft(item.id, index, { unitPrice: event.target.value })}
                             />
-                            <strong>{formatMoney(Math.round(amount * 100))}</strong>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              value={line.lineTotal}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { lineTotal: event.target.value })}
+                            />
                           </div>
                         );
                       })}
@@ -347,13 +399,16 @@ export default function AdminOrderDetailPage() {
                           Save as repeat vendor code
                         </button>
                       </div>
+                      <button className="cart-link" type="button" onClick={() => addIngredientDraftLine(item.id)}>
+                        Add ingredient row
+                      </button>
                     </div>
                   )}
                   <p><span>Total weight</span><b>{item.ingredientQuantity}</b></p>
                   <p><span>Heat treatment</span><b>{item.heatTreatment}</b></p>
                   <p><span>Baking / grinding</span><b>{item.processSpec}</b></p>
                   <p><span>Grinding / 斤</span><b>{formatMoney(item.grindingCostPer600gCents)}</b></p>
-                  <p><span>70% deposit</span><b>{formatMoney(item.depositCents)}</b></p>
+                  <p><span>{order.depositRequired ? "70% new customer deposit" : "Deposit waived for repeat order"}</span><b>{formatMoney(item.depositCents)}</b></p>
                   <p><span>{order.depositRequired ? "30% collection balance" : "collection balance"}</span><b>{formatMoney(item.balanceCents)}</b></p>
                 </div>
               )}
@@ -394,13 +449,13 @@ export default function AdminOrderDetailPage() {
             </select>
           </label>
           <label>
-            Custom Blend deposit
+            Custom Blend customer type
             <select
               value={depositRequired ? "new" : "repeat"}
               onChange={(event) => setDepositRequired(event.target.value === "new")}
             >
-              <option value="new">New customer: 70% deposit</option>
-              <option value="repeat">Repeat customer: deposit waived</option>
+              <option value="new">New customer: 70% deposit applies</option>
+              <option value="repeat">Repeat order: deposit waived</option>
             </select>
           </label>
           <label>

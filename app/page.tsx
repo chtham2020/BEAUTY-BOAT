@@ -1,6 +1,7 @@
 "use client";
 
 import { useLanguagePreference } from "@/lib/language";
+import { MobileBottomTabs } from "./MobileBottomTabs";
 import { ChevronLeft, ChevronRight, MapPin, Phone, ReceiptText, ShoppingCart } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -370,6 +371,7 @@ export default function Home() {
         <span>{brand}</span>
         <p>{t.footer}</p>
       </footer>
+      <MobileBottomTabs active="home" />
     </main>
   );
 }

@@ -1,4 +1,5 @@
 import { requireAdmin } from "@/lib/auth";
+import { calculateBalanceCents, calculateDepositCents } from "@/lib/custom-pricing";
 import { prisma } from "@/lib/prisma";
 import { calculateGstWithRate } from "@/lib/money";
 import { NextResponse } from "next/server";
@@ -31,7 +32,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const parsed = schema.safeParse(await request.json());
   if (!parsed.success) return NextResponse.json({ error: "Invalid order" }, { status: 400 });
 
-  const current = await prisma.order.findUnique({ where: { id } });
+  const current = await prisma.order.findUnique({ where: { id }, include: { items: true } });
   if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const deliveryFeeCents =
@@ -46,19 +47,42 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       : parsed.data.finalTotalCents ??
         (current.hasQuoteItems ? null : current.subtotalCents + gstCents + (deliveryFeeCents ?? 0));
 
-  const order = await prisma.order.update({
-    where: { id },
-    data: {
-      status: parsed.data.status,
-      gstRate,
-      gstCents,
-      deliveryFeeCents,
-      finalTotalCents,
-      deliveryNote: parsed.data.deliveryNote,
-      customerId: parsed.data.customerId,
-      depositRequired: parsed.data.depositRequired,
-    },
-    include: { items: true, billToCustomer: true },
+  const depositRequired = parsed.data.depositRequired ?? current.depositRequired;
+  const order = await prisma.$transaction(async (tx) => {
+    await tx.order.update({
+      where: { id },
+      data: {
+        status: parsed.data.status,
+        gstRate,
+        gstCents,
+        deliveryFeeCents,
+        finalTotalCents,
+        deliveryNote: parsed.data.deliveryNote,
+        customerId: parsed.data.customerId,
+        depositRequired,
+      },
+    });
+
+    if (parsed.data.depositRequired !== undefined) {
+      await Promise.all(
+        current.items
+          .filter((item) => item.vendorCode && item.lineTotalCents != null)
+          .map((item) =>
+            tx.orderItem.update({
+              where: { id: item.id },
+              data: {
+                depositCents: depositRequired ? calculateDepositCents(item.lineTotalCents ?? 0) : 0,
+                balanceCents: depositRequired ? calculateBalanceCents(item.lineTotalCents ?? 0) : item.lineTotalCents,
+              },
+            }),
+          ),
+      );
+    }
+
+    return tx.order.findUniqueOrThrow({
+      where: { id },
+      include: { items: true, billToCustomer: true },
+    });
   });
 
   return NextResponse.json(order);

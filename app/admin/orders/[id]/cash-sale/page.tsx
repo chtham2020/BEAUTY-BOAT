@@ -2,7 +2,6 @@ import { getAdminSession } from "@/lib/auth";
 import { ingredientSubtotalCents, ingredientWeightTotalJin, parseIngredientLines } from "@/lib/custom-ingredients";
 import { formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { PrintButton } from "./PrintButton";
@@ -119,9 +118,6 @@ export default async function CashSalePage({ params }: { params: Promise<{ id: s
 
       <article className="invoice-sheet">
         <header className="invoice-company">
-          <div className="invoice-logo-wrap">
-            <Image src="/images/logo-fo.png" alt="FOOK ON 福安" width={90} height={90} priority />
-          </div>
           <div>
             <h1>福安</h1>
             <h2>Fook On</h2>
