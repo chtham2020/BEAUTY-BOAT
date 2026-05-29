@@ -1,14 +1,25 @@
-import type { CustomQuoteSnapshot } from "./types";
+import type { CartStoredItem, CustomQuoteSnapshot, CustomRecipeSnapshot } from "./types";
 
 export const CUSTOM_BLEND_PRODUCT_ID = "custom-blend";
 export const CUSTOM_DEPOSIT_RATE = 0.7;
+export const CUSTOM_BLEND_MINIMUM_JIN = 10;
 
-export function customCartKey(productId: string, vendorCode?: string) {
-  return vendorCode ? `${productId}:${vendorCode.toUpperCase()}` : productId;
+export function customCartKey(productId: string, vendorCode?: string, recipeId?: string) {
+  if (vendorCode) return `${productId}:${vendorCode.toUpperCase()}`;
+  if (recipeId) return `${productId}:NEW:${recipeId}`;
+  return productId;
 }
 
 export function getCustomBlendWeightJin(quantity: number, quote: CustomQuoteSnapshot) {
   return quote.totalWeightJin ?? quote.minimumQuantityJin ?? quantity;
+}
+
+export function getCustomRecipeWeightJin(recipe: CustomRecipeSnapshot) {
+  return recipe.ingredientLines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0);
+}
+
+export function hasNewCustomRecipe(items: Pick<CartStoredItem, "customRecipe">[]) {
+  return items.some((item) => Boolean(item.customRecipe));
 }
 
 export function calculateGrindingCostCents(quantityJin: number, costPer600gCents: number) {

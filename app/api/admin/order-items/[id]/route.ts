@@ -37,7 +37,9 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     },
   });
   if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
-  if (!current.vendorCode) return NextResponse.json({ error: "Only custom blend items can be edited here" }, { status: 409 });
+  if (!current.vendorCode && !current.ingredients) {
+    return NextResponse.json({ error: "Only custom blend items can be edited here" }, { status: 409 });
+  }
 
   const ingredientLines = parsed.data.ingredientLines.map((line) => ({
     ...line,
@@ -58,15 +60,15 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const subtotalCents = orderItems.reduce((sum, item) => sum + (item.lineTotalCents ?? 0), 0);
   const gstRate = current.order.gstRate as 0 | 9;
   const gstCents = calculateGstWithRate(subtotalCents, gstRate);
-  const finalTotalCents = current.order.hasQuoteItems
-    ? null
-    : subtotalCents + gstCents + (current.order.deliveryFeeCents ?? 0);
+  const hasQuoteItems = orderItems.some((item) => item.id !== current.id && item.quoteOnly);
+  const finalTotalCents = hasQuoteItems ? null : subtotalCents + gstCents + (current.order.deliveryFeeCents ?? 0);
 
   const order = await prisma.order.update({
     where: { id: current.orderId },
     data: {
       subtotalCents,
       gstCents,
+      hasQuoteItems,
       finalTotalCents,
       items: {
         update: {
@@ -76,6 +78,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
             unit: "斤",
             unitPriceCents: 0,
             lineTotalCents,
+            quoteOnly: false,
             ingredients: formatIngredientLines(ingredientLines),
             ingredientQuantity: `${totalWeightJin}斤 total, 1斤 = 600g`,
             grindingCostPer600gCents: parsed.data.grindingCostPerJinCents,

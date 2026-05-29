@@ -85,6 +85,8 @@ export default function AdminOrderDetailPage() {
   const [customers, setCustomers] = useState<CustomerSummary[]>([]);
   const [customerId, setCustomerId] = useState("");
   const [customBlendDrafts, setCustomBlendDrafts] = useState<Record<string, CustomBlendDraft>>({});
+  const [templateCodes, setTemplateCodes] = useState<Record<string, string>>({});
+  const [templateNames, setTemplateNames] = useState<Record<string, string>>({});
   const [aiText, setAiText] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState<string | null>(null);
@@ -105,7 +107,7 @@ export default function AdminOrderDetailPage() {
     setCustomBlendDrafts(
       Object.fromEntries(
         data.items
-          .filter((item: OrderDetail["items"][number]) => item.vendorCode)
+          .filter((item: OrderDetail["items"][number]) => item.vendorCode || item.ingredients)
           .map((item: OrderDetail["items"][number]) => [
             item.id,
             {
@@ -191,6 +193,27 @@ export default function AdminOrderDetailPage() {
     await load();
   }
 
+  async function saveRepeatVendorCode(item: OrderDetail["items"][number]) {
+    const vendorCode = (templateCodes[item.id] || item.vendorCode || "").trim();
+    const vendorName = (templateNames[item.id] || order?.customerName || item.vendorName || "").trim();
+    if (!vendorCode || !vendorName) {
+      window.alert("Vendor code and vendor name are required");
+      return;
+    }
+
+    const response = await fetch("/api/admin/custom-blend-templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderItemId: item.id, vendorCode, vendorName }),
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      window.alert(data?.error || "Save repeat vendor code failed");
+      return;
+    }
+    window.alert(`Saved repeat vendor code ${data.vendorCode}`);
+  }
+
   async function generateAiDraft(kind: (typeof aiDraftKinds)[number]["kind"]) {
     if (!order) return;
     setAiLoading(kind);
@@ -235,12 +258,12 @@ export default function AdminOrderDetailPage() {
           {order.items.map((item) => (
             <div className="admin-order-item" key={item.id}>
               <p>
-                <span>{item.productNameZh} x {item.quantity}{item.vendorCode ? ` ${item.unit}` : ""}</span>
+                <span>{item.productNameZh} x {item.quantity}{item.vendorCode || item.ingredients ? ` ${item.unit}` : ""}</span>
                 <strong>{item.quoteOnly ? "询价" : formatMoney(item.lineTotalCents)}</strong>
               </p>
-              {item.vendorCode && (
+              {(item.vendorCode || item.ingredients) && (
                 <div className="custom-cart-details">
-                  <p><span>Vendor code</span><b>{item.vendorCode} · {item.vendorName}</b></p>
+                  <p><span>Vendor code</span><b>{item.vendorCode ?? "New customer recipe"} · {item.vendorName}</b></p>
                   <p><span>Blend type</span><b>{item.blendType}</b></p>
                   {customBlendDrafts[item.id]?.lines.length > 0 && (
                     <div className="admin-ingredient-editor">
@@ -304,6 +327,26 @@ export default function AdminOrderDetailPage() {
                       <button className="checkout-button" type="button" onClick={() => saveCustomBlendItem(item.id)}>
                         Save ingredient prices
                       </button>
+                      <div className="repeat-code-box">
+                        <label>
+                          Repeat vendor code
+                          <input
+                            value={templateCodes[item.id] ?? item.vendorCode ?? ""}
+                            onChange={(event) => setTemplateCodes((current) => ({ ...current, [item.id]: event.target.value }))}
+                            placeholder="Example: CUST-10"
+                          />
+                        </label>
+                        <label>
+                          Vendor / customer name
+                          <input
+                            value={templateNames[item.id] ?? order.customerName}
+                            onChange={(event) => setTemplateNames((current) => ({ ...current, [item.id]: event.target.value }))}
+                          />
+                        </label>
+                        <button className="cart-link" type="button" onClick={() => saveRepeatVendorCode(item)}>
+                          Save as repeat vendor code
+                        </button>
+                      </div>
                     </div>
                   )}
                   <p><span>Total weight</span><b>{item.ingredientQuantity}</b></p>

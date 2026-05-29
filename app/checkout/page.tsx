@@ -2,7 +2,12 @@
 
 import { DELIVERY_METHODS, type CartStoredItem } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
-import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents } from "@/lib/custom-pricing";
+import {
+  calculateBalanceCents,
+  calculateCustomLineTotalCents,
+  calculateDepositCents,
+  hasNewCustomRecipe,
+} from "@/lib/custom-pricing";
 import { formatMoney } from "@/lib/money";
 import { House } from "lucide-react";
 import Link from "next/link";
@@ -13,27 +18,28 @@ const CART_KEY = "beauty_boat_cart";
 
 const copy = {
   zh: {
-    title: "提交订单",
-    body: "店家会通过 WhatsApp text 或电话跟进最终报价、运输费和 PayNow 付款。",
-    home: "主页",
-    emptyCart: "购物车是空的。",
-    submitFailed: "订单提交失败，请检查资料或稍后再试。",
-    name: "姓名",
-    phone: "电话 / WhatsApp",
-    deliveryMethod: "运输方式",
-    deliveryNote: "取货/配送备注",
-    deliveryPlaceholder: "例如：希望下午送达，或预约自取时间",
-    orderNote: "订单备注",
-    orderPlaceholder: "例如：客制粉料用途、口味方向、数量需求",
-    deliveryFee: "运输费",
-    deliveryFeeValue: "Lalamove/Grab 另计，自费领取可为 0",
+    title: "提交訂單",
+    body: "店家會通過 WhatsApp text 或電話跟進最終報價、運輸費和 PayNow 付款。",
+    home: "主頁",
+    emptyCart: "購物車是空的。",
+    submitFailed: "訂單提交失敗，請檢查資料或稍後再試。",
+    name: "姓名或公司名稱",
+    phone: "電話 / WhatsApp",
+    deliveryMethod: "運輸方式",
+    deliveryNote: "地址 / 取貨 / 配送備註",
+    deliveryPlaceholder: "新客客製粉料請填地址或取貨安排；例如下午送達或預約自取時間",
+    orderNote: "訂單備註",
+    orderPlaceholder: "例如：客製粉料用途、口味方向、包裝需求",
+    deliveryFee: "運輸費",
+    deliveryFeeValue: "Lalamove/Grab 另計，自費領取可為 0",
     payment: "付款",
-    paymentValue: "店家确认后 PayNow",
+    paymentValue: "店家確認後 PayNow",
     customSubtotal: "Custom Blend subtotal",
     deposit: "70% deposit",
     balance: "30% upon collection",
+    recipePending: "New custom blend quotation pending. 70% deposit is required after quote confirmation.",
     submitting: "提交中...",
-    submit: "提交订单",
+    submit: "提交訂單",
   },
   en: {
     title: "Submit Order",
@@ -41,13 +47,13 @@ const copy = {
     home: "Home",
     emptyCart: "Shopping Cart is empty.",
     submitFailed: "Order submission failed. Please check your details or try again later.",
-    name: "Name",
+    name: "Name or Company Name",
     phone: "Phone / WhatsApp",
     deliveryMethod: "Delivery Method",
-    deliveryNote: "Pickup / Delivery Note",
-    deliveryPlaceholder: "Example: afternoon delivery preferred, or self-pickup appointment time",
+    deliveryNote: "Address / Pickup / Delivery Note",
+    deliveryPlaceholder: "For new custom blends, provide address or pickup arrangement. Example: afternoon delivery preferred.",
     orderNote: "Order Note",
-    orderPlaceholder: "Example: custom blend use, flavour direction, quantity needed",
+    orderPlaceholder: "Example: custom blend use, flavour direction, packing request",
     deliveryFee: "Delivery Fee",
     deliveryFeeValue: "Lalamove/Grab quoted separately. Self pickup can be 0.",
     payment: "Payment",
@@ -55,6 +61,7 @@ const copy = {
     customSubtotal: "Custom Blend Subtotal",
     deposit: "70% Deposit",
     balance: "30% Upon Collection",
+    recipePending: "New custom blend quotation pending. 70% deposit is required after quote confirmation.",
     submitting: "Submitting...",
     submit: "Submit Order",
   },
@@ -63,7 +70,7 @@ const copy = {
 function readCart(): CartStoredItem[] {
   try {
     const items = JSON.parse(window.localStorage.getItem(CART_KEY) || "[]") as CartStoredItem[];
-    return items.filter((item) => item.productId !== CUSTOM_BLEND_PRODUCT_ID || item.customQuote);
+    return items.filter((item) => item.customQuote || item.customRecipe || item.productId !== "custom-blend");
   } catch {
     return [];
   }
@@ -80,7 +87,9 @@ export default function CheckoutPage() {
   const t = copy[language];
 
   useEffect(() => {
-    setCartItems(readCart());
+    const items = readCart();
+    setCartItems(items);
+    if (hasNewCustomRecipe(items)) setDepositRequired(true);
   }, []);
 
   const customTotals = useMemo(() => {
@@ -92,6 +101,7 @@ export default function CheckoutPage() {
       customSubtotal,
       deposit: depositRequired ? calculateDepositCents(customSubtotal) : 0,
       balance: depositRequired ? calculateBalanceCents(customSubtotal) : customSubtotal,
+      hasNewRecipe: hasNewCustomRecipe(cartItems),
     };
   }, [cartItems, depositRequired]);
 
@@ -115,14 +125,15 @@ export default function CheckoutPage() {
         deliveryNote: formData.get("deliveryNote"),
         customerNote: formData.get("customerNote"),
         gstRate,
-        depositRequired,
+        depositRequired: customTotals.hasNewRecipe ? true : depositRequired,
         items,
       }),
     });
 
     setLoading(false);
     if (!response.ok) {
-      setError(t.submitFailed);
+      const data = await response.json().catch(() => null);
+      setError(data?.error || t.submitFailed);
       return;
     }
 
@@ -176,6 +187,7 @@ export default function CheckoutPage() {
           <select
             value={depositRequired ? "new" : "repeat"}
             onChange={(event) => setDepositRequired(event.target.value === "new")}
+            disabled={customTotals.hasNewRecipe}
           >
             <option value="new">New customer: 70% deposit</option>
             <option value="repeat">Repeat customer: deposit waived</option>
@@ -183,7 +195,7 @@ export default function CheckoutPage() {
         </label>
         <label>
           {t.deliveryNote}
-          <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} />
+          <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} required={customTotals.hasNewRecipe} />
         </label>
         <label>
           {t.orderNote}
@@ -191,6 +203,7 @@ export default function CheckoutPage() {
         </label>
         <div className="summary-box">
           <p><span>GST</span><strong>{gstRate}%</strong></p>
+          {customTotals.hasNewRecipe && <p><span>New Custom Blend</span><strong>{t.recipePending}</strong></p>}
           {customTotals.customSubtotal > 0 && (
             <>
               <p><span>{t.customSubtotal}</span><strong>{formatMoney(customTotals.customSubtotal)}</strong></p>

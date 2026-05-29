@@ -1,28 +1,50 @@
 "use client";
 
 import { formatMoney } from "@/lib/money";
-import { CUSTOM_BLEND_PRODUCT_ID, calculateBalanceCents, calculateCustomLineTotalCents, calculateDepositCents, customCartKey, getCustomBlendWeightJin } from "@/lib/custom-pricing";
-import type { CartStoredItem, CustomQuoteSnapshot, PublicProduct } from "@/lib/types";
+import {
+  CUSTOM_BLEND_MINIMUM_JIN,
+  CUSTOM_BLEND_PRODUCT_ID,
+  calculateBalanceCents,
+  calculateCustomLineTotalCents,
+  calculateDepositCents,
+  customCartKey,
+  getCustomBlendWeightJin,
+  getCustomRecipeWeightJin,
+  hasNewCustomRecipe,
+} from "@/lib/custom-pricing";
+import type { CartStoredItem, CustomQuoteSnapshot, CustomRecipeSnapshot, PublicProduct } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
-import { Check, House, ShoppingCart, Square } from "lucide-react";
+import { Check, House, Plus, ShoppingCart, Square, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const CART_KEY = "beauty_boat_cart";
+
+type RecipeDraftLine = {
+  name: string;
+  quantityJin: string;
+};
+
+type IngredientCatalogItem = {
+  nameZh: string;
+  nameEn: string;
+};
 
 const copy = {
   zh: {
     eyebrow: "Hermes Order",
-    title: "产品订购",
-    body: "固定价格商品可预估金额；客制粉料会由店家通过 WhatsApp text/电话确认报价。",
-    home: "主页",
-    cart: "购物车",
-    inCartStatus: "已加入购物车，到 Shopping Cart 调整数量",
-    unit: "单位",
-    stock: "库存",
-    price: "价格",
-    quote: "询价",
-    confirm: "需确认",
+    title: "產品訂購",
+    body: "固定價格商品可預估金額；客製粉料會由店家通過 WhatsApp text/電話確認報價。",
+    home: "主頁",
+    cart: "購物車",
+    inCartStatus: "已加入購物車，到 Shopping Cart 調整數量",
+    unit: "單位",
+    stock: "庫存",
+    price: "價格",
+    quote: "詢價",
+    confirm: "需確認",
+    repeatMode: "Repeat vendor code",
+    newMode: "New customer recipe",
     vendorCode: "Vendor code",
     vendorPlaceholder: "Enter company vendor code",
     validateVendor: "Verify code",
@@ -30,14 +52,25 @@ const copy = {
     invalidVendor: "Vendor code not found",
     quoteReady: "Quotation ready",
     ingredients: "Ingredients",
+    ingredientName: "Ingredient name",
+    ingredientPlaceholder: "Select or type ingredient",
+    quantityJin: "Quantity 斤",
+    addRow: "Add row",
+    removeRow: "Remove row",
+    recipeNote: "Recipe / packing notes",
+    recipeNotePlaceholder: "Grinding, packing, taste direction, delivery notes",
+    newRecipeHelp: "Minimum 10斤 / 6kg. New custom blend orders require 70% deposit after quotation.",
+    belowMinimum: "Minimum order is 10斤 / 6kg.",
+    exclusive: "New custom blend recipe must be ordered alone. Adding it will replace other cart items.",
+    recipePending: "Final amount pending shop quotation",
     heatTreatment: "Heat treatment",
     processSpec: "Baking / grinding spec",
     minimumQuantity: "Minimum quantity",
-    totalWeight: "总重量",
-    grindingCost: "Grinding cost / 600g",
+    totalWeight: "總重量",
+    grindingCost: "Grinding cost / 斤",
     deposit: "70% deposit",
     balance: "30% upon collection",
-    addToCart: "加入购物车",
+    addToCart: "加入購物車",
   },
   en: {
     eyebrow: "Order",
@@ -51,6 +84,8 @@ const copy = {
     price: "Price",
     quote: "Quote",
     confirm: "Confirm",
+    repeatMode: "Repeat vendor code",
+    newMode: "New customer recipe",
     vendorCode: "Vendor Code",
     vendorPlaceholder: "Enter company vendor code",
     validateVendor: "Verify Code",
@@ -58,11 +93,22 @@ const copy = {
     invalidVendor: "Vendor code not found",
     quoteReady: "Quotation Ready",
     ingredients: "Ingredients",
+    ingredientName: "Ingredient name",
+    ingredientPlaceholder: "Select or type ingredient",
+    quantityJin: "Quantity jin",
+    addRow: "Add row",
+    removeRow: "Remove row",
+    recipeNote: "Recipe / packing notes",
+    recipeNotePlaceholder: "Grinding, packing, taste direction, delivery notes",
+    newRecipeHelp: "Minimum 10 jin / 6kg. New custom blend orders require 70% deposit after quotation.",
+    belowMinimum: "Minimum order is 10 jin / 6kg.",
+    exclusive: "New custom blend recipe must be ordered alone. Adding it will replace other cart items.",
+    recipePending: "Final amount pending shop quotation",
     heatTreatment: "Heat Treatment",
     processSpec: "Baking / Grinding Spec",
     minimumQuantity: "Minimum Quantity",
     totalWeight: "Total Weight",
-    grindingCost: "Grinding Cost / 600g",
+    grindingCost: "Grinding Cost / jin",
     deposit: "70% Deposit",
     balance: "30% Upon Collection",
     addToCart: "Add to Shopping Cart",
@@ -79,7 +125,7 @@ function readCart(): CartStoredItem[] {
   if (typeof window === "undefined") return [];
   try {
     const items = JSON.parse(window.localStorage.getItem(CART_KEY) || "[]") as CartStoredItem[];
-    return items.filter((item) => item.productId !== CUSTOM_BLEND_PRODUCT_ID || item.customQuote);
+    return items.filter((item) => item.productId !== CUSTOM_BLEND_PRODUCT_ID || item.customQuote || item.customRecipe);
   } catch {
     return [];
   }
@@ -89,21 +135,61 @@ function writeCart(items: CartStoredItem[]) {
   window.localStorage.setItem(CART_KEY, JSON.stringify(items));
 }
 
+function makeRecipeSnapshot(lines: RecipeDraftLine[], notes: string): CustomRecipeSnapshot {
+  const ingredientLines = lines
+    .map((line) => ({ name: line.name.trim(), quantityJin: Number(line.quantityJin) }))
+    .filter((line) => line.name && line.quantityJin > 0);
+  const totalWeightJin = ingredientLines.reduce((sum, line) => sum + line.quantityJin, 0);
+  return {
+    recipeId: `recipe-${Date.now()}`,
+    customerType: "new",
+    vendorName: "New customer recipe",
+    blendType: "First-time custom blend",
+    ingredientLines,
+    ingredients: ingredientLines.map((line) => line.name),
+    ingredientQuantity: `${totalWeightJin}斤 total, 1斤 = 600g`,
+    totalWeightJin,
+    unit: "斤",
+    heatTreatment: "Shop to confirm",
+    processSpec: "Shop to confirm",
+    minimumQuantityJin: CUSTOM_BLEND_MINIMUM_JIN,
+    notes: notes.trim() || undefined,
+  };
+}
+
 export default function ProductsPage() {
   const { language } = useLanguagePreference();
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [cartCount, setCartCount] = useState(0);
   const [selectedCartKeys, setSelectedCartKeys] = useState<string[]>([]);
+  const [cartHasNewRecipe, setCartHasNewRecipe] = useState(false);
   const [vendorCodes, setVendorCodes] = useState<Record<string, string>>({});
   const [vendorQuotes, setVendorQuotes] = useState<Record<string, CustomQuoteSnapshot>>({});
   const [vendorErrors, setVendorErrors] = useState<Record<string, string>>({});
   const [validatingCodes, setValidatingCodes] = useState<Record<string, boolean>>({});
+  const [ingredientCatalog, setIngredientCatalog] = useState<IngredientCatalogItem[]>([]);
+  const [customMode, setCustomMode] = useState<"repeat" | "new">("repeat");
+  const [recipeLines, setRecipeLines] = useState<RecipeDraftLine[]>([
+    { name: "", quantityJin: "" },
+    { name: "", quantityJin: "" },
+    { name: "", quantityJin: "" },
+  ]);
+  const [recipeNotes, setRecipeNotes] = useState("");
   const t = copy[language];
+
+  const recipeWeightJin = useMemo(
+    () => recipeLines.reduce((sum, line) => sum + (Number(line.quantityJin) || 0), 0),
+    [recipeLines],
+  );
 
   useEffect(() => {
     fetch("/api/products")
       .then((res) => res.json())
       .then(setProducts);
+    fetch("/api/ingredients")
+      .then((res) => res.json())
+      .then(setIngredientCatalog)
+      .catch(() => setIngredientCatalog([]));
     refreshCartState();
 
     window.addEventListener("focus", refreshCartState);
@@ -117,7 +203,8 @@ export default function ProductsPage() {
   function refreshCartState() {
     const cart = readCart();
     setCartCount(cart.reduce((sum, item) => sum + item.quantity, 0));
-    setSelectedCartKeys(cart.map((item) => customCartKey(item.productId, item.customQuote?.vendorCode)));
+    setCartHasNewRecipe(hasNewCustomRecipe(cart));
+    setSelectedCartKeys(cart.map((item) => customCartKey(item.productId, item.customQuote?.vendorCode, item.customRecipe?.recipeId)));
     for (const item of cart) {
       if (item.productId === CUSTOM_BLEND_PRODUCT_ID && item.customQuote) {
         setVendorCodes((current) => ({ ...current, [item.productId]: item.customQuote?.vendorCode ?? "" }));
@@ -129,12 +216,33 @@ export default function ProductsPage() {
   function toggleCartItem(product: PublicProduct, customQuote?: CustomQuoteSnapshot) {
     const cart = readCart();
     const key = customCartKey(product.id, customQuote?.vendorCode);
-    const existing = cart.find((item) => customCartKey(item.productId, item.customQuote?.vendorCode) === key);
-    const nextCart = existing
-      ? cart.filter((item) => customCartKey(item.productId, item.customQuote?.vendorCode) !== key)
-      : [...cart, { productId: product.id, quantity: customQuote ? getCustomBlendWeightJin(customQuote.minimumQuantityJin ?? customQuote.minimumQuantityKg, customQuote) : 1, customQuote }];
+    const existing = cart.find((item) => customCartKey(item.productId, item.customQuote?.vendorCode, item.customRecipe?.recipeId) === key);
+    let nextCart: CartStoredItem[];
+
+    if (existing) {
+      nextCart = cart.filter((item) => customCartKey(item.productId, item.customQuote?.vendorCode, item.customRecipe?.recipeId) !== key);
+    } else {
+      const cleanCart = cart.filter((item) => !item.customRecipe);
+      nextCart = [
+        ...cleanCart,
+        {
+          productId: product.id,
+          quantity: customQuote
+            ? getCustomBlendWeightJin(customQuote.minimumQuantityJin ?? customQuote.minimumQuantityKg, customQuote)
+            : 1,
+          customQuote,
+        },
+      ];
+    }
 
     writeCart(nextCart);
+    refreshCartState();
+  }
+
+  function addNewRecipe(product: PublicProduct) {
+    const recipe = makeRecipeSnapshot(recipeLines, recipeNotes);
+    if (getCustomRecipeWeightJin(recipe) < CUSTOM_BLEND_MINIMUM_JIN) return;
+    writeCart([{ productId: product.id, quantity: recipe.totalWeightJin, customRecipe: recipe }]);
     refreshCartState();
   }
 
@@ -202,7 +310,8 @@ export default function ProductsPage() {
           const cartKey = customCartKey(product.id, quote?.vendorCode);
           const isSelected = selectedCartKeys.includes(cartKey);
           const isUnavailable = !product.quoteOnly && product.stock <= 0;
-          const isAddDisabled = isUnavailable || (isCustomBlend && !quote);
+          const isBlockedByNewRecipe = cartHasNewRecipe && !isCustomBlend;
+          const isAddDisabled = isUnavailable || isBlockedByNewRecipe || (isCustomBlend && customMode === "repeat" && !quote);
           const productName = language === "en" ? product.nameEn : product.nameZh;
           const supportName = language === "en" ? product.nameZh : product.nameEn;
           const description =
@@ -238,31 +347,137 @@ export default function ProductsPage() {
                 </dl>
                 {isCustomBlend && (
                   <div className="vendor-quote-box">
-                    <label>
-                      {t.vendorCode}
-                      <input
-                        value={vendorCodes[product.id] || ""}
-                        onChange={(event) => {
-                          setVendorCodes((current) => ({ ...current, [product.id]: event.target.value }));
-                          setVendorQuotes((current) => {
-                            const next = { ...current };
-                            delete next[product.id];
-                            return next;
-                          });
-                        }}
-                        placeholder={t.vendorPlaceholder}
-                      />
-                    </label>
-                    <button
-                      className="quote-check-button"
-                      type="button"
-                      onClick={() => validateVendorCode(product.id)}
-                      disabled={validatingCodes[product.id]}
-                    >
-                      {validatingCodes[product.id] ? t.validating : t.validateVendor}
-                    </button>
-                    {vendorErrors[product.id] && <p className="form-error">{vendorErrors[product.id]}</p>}
-                    {quote && (
+                    <div className="segmented-control">
+                      <button
+                        className={customMode === "repeat" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => setCustomMode("repeat")}
+                      >
+                        {t.repeatMode}
+                      </button>
+                      <button
+                        className={customMode === "new" ? "is-active" : ""}
+                        type="button"
+                        onClick={() => setCustomMode("new")}
+                      >
+                        {t.newMode}
+                      </button>
+                    </div>
+
+                    {customMode === "repeat" ? (
+                      <>
+                        <label>
+                          {t.vendorCode}
+                          <input
+                            value={vendorCodes[product.id] || ""}
+                            onChange={(event) => {
+                              setVendorCodes((current) => ({ ...current, [product.id]: event.target.value }));
+                              setVendorQuotes((current) => {
+                                const next = { ...current };
+                                delete next[product.id];
+                                return next;
+                              });
+                            }}
+                            placeholder={t.vendorPlaceholder}
+                          />
+                        </label>
+                        <button
+                          className="quote-check-button"
+                          type="button"
+                          onClick={() => validateVendorCode(product.id)}
+                          disabled={validatingCodes[product.id]}
+                        >
+                          {validatingCodes[product.id] ? t.validating : t.validateVendor}
+                        </button>
+                        {vendorErrors[product.id] && <p className="form-error">{vendorErrors[product.id]}</p>}
+                      </>
+                    ) : (
+                      <div className="recipe-builder">
+                        <p>{t.newRecipeHelp}</p>
+                        <p className="form-hint">{t.exclusive}</p>
+                        {recipeLines.map((line, index) => (
+                          <div className="recipe-row" key={index}>
+                            <input
+                              aria-label={t.ingredientName}
+                              list="custom-blend-ingredients"
+                              value={line.name}
+                              onChange={(event) =>
+                                setRecipeLines((current) =>
+                                  current.map((entry, entryIndex) =>
+                                    entryIndex === index ? { ...entry, name: event.target.value } : entry,
+                                  ),
+                                )
+                              }
+                              placeholder={t.ingredientPlaceholder}
+                            />
+                            <input
+                              aria-label={t.quantityJin}
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={line.quantityJin}
+                              onChange={(event) =>
+                                setRecipeLines((current) =>
+                                  current.map((entry, entryIndex) =>
+                                    entryIndex === index ? { ...entry, quantityJin: event.target.value } : entry,
+                                  ),
+                                )
+                              }
+                              placeholder={t.quantityJin}
+                            />
+                            <button
+                              type="button"
+                              className="icon-button"
+                              aria-label={t.removeRow}
+                              onClick={() => setRecipeLines((current) => current.filter((_, entryIndex) => entryIndex !== index))}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        ))}
+                        <datalist id="custom-blend-ingredients">
+                          {ingredientCatalog.map((ingredient) => (
+                            <option
+                              key={`${ingredient.nameZh}-${ingredient.nameEn}`}
+                              value={ingredient.nameZh}
+                              label={ingredient.nameEn}
+                            />
+                          ))}
+                        </datalist>
+                        <button
+                          className="quote-check-button"
+                          type="button"
+                          onClick={() => setRecipeLines((current) => [...current, { name: "", quantityJin: "" }])}
+                        >
+                          <Plus size={16} /> {t.addRow}
+                        </button>
+                        <label>
+                          {t.recipeNote}
+                          <textarea
+                            value={recipeNotes}
+                            onChange={(event) => setRecipeNotes(event.target.value)}
+                            rows={3}
+                            placeholder={t.recipeNotePlaceholder}
+                          />
+                        </label>
+                        <div className="quote-panel">
+                          <p><span>{t.totalWeight}</span><b>{recipeWeightJin}斤 / {(recipeWeightJin * 0.6).toFixed(1)}kg</b></p>
+                          <p><span>{t.price}</span><b>{t.recipePending}</b></p>
+                          <p><span>{t.deposit}</span><b>{t.recipePending}</b></p>
+                          {recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN && <p className="form-error">{t.belowMinimum}</p>}
+                        </div>
+                        <button
+                          className="checkout-button"
+                          type="button"
+                          onClick={() => addNewRecipe(product)}
+                          disabled={recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN}
+                        >
+                          {t.addToCart}
+                        </button>
+                      </div>
+                    )}
+
+                    {customMode === "repeat" && quote && (
                       <div className="quote-panel">
                         <strong>{t.quoteReady}: {quote.vendorCode}</strong>
                         <p>{quote.vendorName} · {quote.blendType}</p>
@@ -296,22 +511,24 @@ export default function ProductsPage() {
                     )}
                   </div>
                 )}
-                <button
-                  className={isSelected ? "is-checked" : ""}
-                  type="button"
-                  onClick={() => toggleCartItem(product, isCustomBlend ? quote : undefined)}
-                  disabled={isAddDisabled}
-                  aria-pressed={isSelected}
-                >
-                  {isSelected ? (
-                    <span className="checkbox-icon is-checked" aria-hidden="true">
-                      <Check size={14} />
-                    </span>
-                  ) : (
-                    <Square size={17} aria-hidden="true" />
-                  )}
-                  {t.addToCart}
-                </button>
+                {(!isCustomBlend || customMode === "repeat") && (
+                  <button
+                    className={isSelected ? "is-checked" : ""}
+                    type="button"
+                    onClick={() => toggleCartItem(product, isCustomBlend ? quote : undefined)}
+                    disabled={isAddDisabled}
+                    aria-pressed={isSelected}
+                  >
+                    {isSelected ? (
+                      <span className="checkbox-icon is-checked" aria-hidden="true">
+                        <Check size={14} />
+                      </span>
+                    ) : (
+                      <Square size={17} aria-hidden="true" />
+                    )}
+                    {t.addToCart}
+                  </button>
+                )}
               </div>
             </article>
           );

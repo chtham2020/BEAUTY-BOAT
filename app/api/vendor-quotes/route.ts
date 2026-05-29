@@ -1,5 +1,5 @@
 import { CUSTOM_BLEND_PRODUCT_ID } from "@/lib/custom-pricing";
-import { getVendorQuote } from "@/lib/vendor-quotes";
+import { getVendorQuoteFromDb } from "@/lib/vendor-quotes";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Vendor code applies only to Custom Blend" }, { status: 400 });
   }
 
-  const quote = getVendorQuote(parsed.data.vendorCode);
+  const quote = await getVendorQuoteFromDb(parsed.data.vendorCode);
   if (!quote) {
     return NextResponse.json({ error: "Vendor code not found" }, { status: 404 });
   }

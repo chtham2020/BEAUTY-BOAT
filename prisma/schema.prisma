@@ -98,3 +98,31 @@ model AdminUser {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+model CustomBlendTemplate {
+  id                         String                          @id @default(cuid())
+  vendorCode                 String                          @unique
+  vendorName                 String
+  blendType                  String
+  unit                       String                          @default("斤")
+  heatTreatment              String?
+  processSpec                String?
+  grindingCostPer600gCents   Int                             @default(0)
+  minimumQuantityJin         Float
+  totalWeightJin             Float
+  active                     Boolean                         @default(true)
+  createdFromOrderItemId     String?
+  createdAt                  DateTime                        @default(now())
+  updatedAt                  DateTime                        @updatedAt
+  ingredients                CustomBlendTemplateIngredient[]
+}
+
+model CustomBlendTemplateIngredient {
+  id             String              @id @default(cuid())
+  templateId     String
+  name           String
+  quantityJin    Float
+  unitPriceCents Int                 @default(0)
+  sortOrder      Int                 @default(0)
+  template       CustomBlendTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+}

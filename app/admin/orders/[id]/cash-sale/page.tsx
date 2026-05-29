@@ -47,7 +47,7 @@ async function getOrder(id: string) {
 
 function renderInvoiceItemRows(item: NonNullable<Awaited<ReturnType<typeof getOrder>>>["items"][number]) {
   const ingredientLines = parseIngredientLines(item.ingredients);
-  if (item.vendorCode && ingredientLines.length > 0) {
+  if (ingredientLines.length > 0) {
     const totalWeightJin = ingredientWeightTotalJin(ingredientLines);
     const ingredientsSubtotal = ingredientSubtotalCents(ingredientLines);
     const grindingTotal = Math.max(0, (item.lineTotalCents ?? 0) - ingredientsSubtotal);

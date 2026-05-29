@@ -1,4 +1,5 @@
 import type { CustomQuoteSnapshot } from "./types";
+import { prisma } from "./prisma";
 
 function withTotalWeight(quote: CustomQuoteSnapshot): CustomQuoteSnapshot {
   const totalWeightJin =
@@ -126,4 +127,41 @@ const vendorQuotes: Record<string, CustomQuoteSnapshot> = {
 export function getVendorQuote(vendorCode: string) {
   const quote = vendorQuotes[vendorCode.trim().toUpperCase()] ?? null;
   return quote ? withTotalWeight(quote) : null;
+}
+
+export async function getVendorQuoteFromDb(vendorCode: string) {
+  const code = vendorCode.trim().toUpperCase();
+  const staticQuote = getVendorQuote(code);
+  if (staticQuote) return staticQuote;
+
+  const template = await prisma.customBlendTemplate.findFirst({
+    where: { vendorCode: code, active: true },
+    include: { ingredients: { orderBy: { sortOrder: "asc" } } },
+  });
+  if (!template) return null;
+
+  const ingredientLines = template.ingredients.map((ingredient) => ({
+    name: ingredient.name,
+    quantityJin: ingredient.quantityJin,
+    unitPriceCents: ingredient.unitPriceCents,
+    lineTotalCents: Math.round(ingredient.quantityJin * ingredient.unitPriceCents),
+  }));
+
+  return withTotalWeight({
+    vendorCode: template.vendorCode,
+    vendorName: template.vendorName,
+    blendType: template.blendType,
+    ingredients: ingredientLines.map((ingredient) => ingredient.name),
+    ingredientLines,
+    ingredientQuantity: `${template.totalWeightJin}斤 total blend, 1斤 = 600g`,
+    unit: template.unit,
+    heatTreatment: template.heatTreatment ?? "Repeat customer supplied blend; confirm before grinding",
+    processSpec: template.processSpec ?? "Fine grinding charge applies on total finished mixture weight",
+    grindingCostPer600gCents: template.grindingCostPer600gCents,
+    grindingCostPerJinCents: template.grindingCostPer600gCents,
+    minimumQuantityKg: template.minimumQuantityJin,
+    minimumQuantityJin: template.minimumQuantityJin,
+    totalWeightJin: template.totalWeightJin,
+    unitPriceCents: 0,
+  });
 }

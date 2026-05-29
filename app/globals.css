@@ -827,6 +827,70 @@ footer p {
   padding: 11px;
 }
 
+.vendor-quote-box textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf7;
+  color: var(--ink);
+  font: inherit;
+  line-height: 1.55;
+  padding: 11px;
+  resize: vertical;
+}
+
+.segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border-radius: 999px;
+  background: rgba(47, 102, 82, 0.09);
+  padding: 4px;
+}
+
+.segmented-control button {
+  min-height: 36px;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--green);
+  padding: 0 10px;
+}
+
+.segmented-control button.is-active {
+  background: var(--green);
+  color: #fff7e8;
+}
+
+.recipe-builder {
+  display: grid;
+  gap: 10px;
+}
+
+.recipe-builder > p {
+  margin: 0;
+}
+
+.form-hint {
+  color: var(--wood);
+  font-weight: 800;
+}
+
+.recipe-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 38px;
+  gap: 8px;
+  align-items: center;
+}
+
+.shop-card button.icon-button {
+  width: 38px;
+  min-height: 38px;
+  border-radius: 8px;
+  background: rgba(164, 31, 18, 0.1);
+  color: #a41f12;
+  padding: 0;
+}
+
 .quote-check-button {
   min-height: 38px;
 }
@@ -1146,6 +1210,33 @@ footer p {
 .admin-ingredient-editor {
   display: grid;
   gap: 8px;
+}
+
+.repeat-code-box {
+  display: grid;
+  gap: 10px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(36, 26, 19, 0.12);
+  padding-top: 10px;
+}
+
+.repeat-code-box label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.repeat-code-box input {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fffdf7;
+  color: var(--ink);
+  font: inherit;
+  padding: 9px;
 }
 
 .admin-ingredient-header,
