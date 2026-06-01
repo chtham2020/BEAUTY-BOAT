@@ -53,6 +53,7 @@
 - The system should show a total weight row in 「斤」 for the whole package before calculating grinding charge.
 - Use 1 斤 = 600g. Grinding charge can be stored/displayed as cost per 斤.
 - Customer copy examples such as 王祥顺 may show whole-package totals like 20.5斤; Hermes must support decimal quantities such as 20.5.
+- Repeat vendor-code formulas are proprietary. The public frontend may verify a vendor code and show only the vendor code, verified status, total/minimum weight, unit, and a generic processing note. It must not expose customer/vendor names, ingredient names, ingredient quantities, prices, grinding charge, heat/process details, or formula details. Full repeat formula details may appear only in backend/admin, invoice generation, AI drafts, and internal alerts after the order is received.
 
 ## Hermes AI Experiment
 - AI features live only in the `codex/hermes-ai-assistant` worktree until merged.

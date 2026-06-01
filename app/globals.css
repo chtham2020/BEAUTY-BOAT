@@ -16,6 +16,11 @@
   box-sizing: border-box;
 }
 
+html,
+body {
+  max-width: 100%;
+}
+
 html {
   scroll-behavior: smooth;
 }
@@ -40,6 +45,21 @@ a {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  max-width: 100%;
+}
+
+img,
+svg,
+video,
+canvas {
+  max-width: 100%;
 }
 
 .site-shell {
@@ -173,6 +193,11 @@ a {
 .language-toggle .is-active {
   background: var(--green);
   color: #fff7e8;
+}
+
+.admin-language-toggle {
+  display: inline-grid;
+  flex: 0 0 auto;
 }
 
 .hero {
@@ -669,6 +694,8 @@ footer p {
   align-items: center;
   justify-content: center;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
   min-height: 42px;
   border: 0;
   border-radius: 999px;
@@ -677,7 +704,11 @@ footer p {
   cursor: pointer;
   font-family: Arial, sans-serif;
   font-weight: 800;
+  line-height: 1.2;
   padding: 0 16px;
+  text-align: center;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .cart-link {
@@ -719,6 +750,7 @@ footer p {
 }
 
 .shop-card > div {
+  min-width: 0;
   padding: 22px;
 }
 
@@ -785,6 +817,7 @@ footer p {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   border-bottom: 1px solid rgba(36, 26, 19, 0.1);
   padding-bottom: 8px;
 }
@@ -796,6 +829,9 @@ footer p {
 .shop-card dd {
   margin: 0;
   font-weight: 800;
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .vendor-quote-box {
@@ -819,6 +855,7 @@ footer p {
 
 .vendor-quote-box input {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf7;
@@ -829,6 +866,7 @@ footer p {
 
 .vendor-quote-box textarea {
   width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf7;
@@ -849,6 +887,7 @@ footer p {
 }
 
 .segmented-control button {
+  min-width: 0;
   min-height: 36px;
   border-radius: 999px;
   background: transparent;
@@ -899,6 +938,7 @@ footer p {
 .custom-cart-details {
   display: grid;
   gap: 6px;
+  min-width: 0;
   border-radius: 8px;
   background: rgba(47, 102, 82, 0.08);
   padding: 12px;
@@ -919,18 +959,39 @@ footer p {
   display: flex;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   margin: 0;
   line-height: 1.45;
 }
 
 .quote-panel span,
 .custom-cart-details span {
+  min-width: 0;
   color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.quote-panel p > span,
+.custom-cart-details p > span {
+  display: inline-block;
+  min-width: max-content;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+  overflow-wrap: normal;
+  word-break: keep-all;
+  white-space: nowrap;
+}
+
+.quote-panel p:not(.form-hint) span::after,
+.custom-cart-details p:not(.form-hint) span::after {
+  content: ":";
 }
 
 .quote-panel b,
 .custom-cart-details b {
+  min-width: 0;
   text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .ai-panel {
@@ -1097,6 +1158,8 @@ footer p {
 
 .admin-price-control input {
   width: 120px;
+  max-width: 100%;
+  min-width: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fffdf7;
@@ -1242,6 +1305,7 @@ footer p {
   grid-template-columns: minmax(110px, 1fr) 82px 92px 110px;
   gap: 8px;
   align-items: center;
+  min-width: 0;
 }
 
 .admin-ingredient-header {
@@ -1589,7 +1653,7 @@ footer p {
     grid-template-columns: minmax(0, 1fr);
     gap: 12px;
     min-height: 68px;
-    padding-right: 82px;
+    padding-right: 76px;
   }
 
   .wordmark {
@@ -1605,12 +1669,18 @@ footer p {
   }
 
   .topbar-actions {
-    gap: 8px;
     min-width: 0;
+    gap: 8px;
+    justify-content: flex-start;
   }
 
   .language-toggle {
     display: none;
+  }
+
+  .admin-language-toggle {
+    display: inline-grid;
+    width: 100%;
   }
 
   .hero,
@@ -1660,6 +1730,7 @@ footer p {
   .hero-actions,
   .shop-actions {
     width: 100%;
+    min-width: 0;
     justify-content: flex-start;
   }
 
@@ -1668,7 +1739,15 @@ footer p {
   .checkout-button,
   .shop-card button,
   .admin-row button {
+    flex: 1 1 100%;
+    width: 100%;
     min-height: 46px;
+    max-width: 100%;
+    padding-right: 12px;
+    padding-left: 12px;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
     white-space: normal;
     text-align: center;
   }
@@ -1738,9 +1817,7 @@ footer p {
   }
 
   .shop-card {
-    display: grid;
-    grid-template-columns: 92px minmax(0, 1fr);
-    align-items: stretch;
+    display: block;
     border-radius: 18px;
     background: rgba(255, 253, 247, 0.95);
     box-shadow: 0 12px 32px rgba(95, 57, 31, 0.12);
@@ -1755,10 +1832,11 @@ footer p {
   }
 
   .shop-card img {
-    height: 100%;
-    min-height: 148px;
-    aspect-ratio: auto;
-    border-radius: 18px 0 0 18px;
+    width: 100%;
+    height: auto;
+    min-height: 0;
+    aspect-ratio: 16 / 10;
+    border-radius: 18px 18px 0 0;
   }
 
   .shop-card.is-custom-blend img {
@@ -1810,7 +1888,7 @@ footer p {
   }
 
   .shop-card dl {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 6px;
     margin: 12px 0;
   }
@@ -1869,8 +1947,13 @@ footer p {
   }
 
   .recipe-row {
-    grid-template-columns: minmax(0, 1fr) 92px 42px;
+    grid-template-columns: minmax(0, 1fr);
     gap: 8px;
+  }
+
+  .shop-card button.icon-button {
+    width: 100%;
+    min-height: 42px;
   }
 
   .quote-panel,
@@ -1879,21 +1962,37 @@ footer p {
     min-width: 0;
   }
 
-  .quote-panel p,
-  .custom-cart-details p,
+  .quote-panel p:not(.form-hint),
+  .shop-card.is-custom-blend .quote-panel p:not(.form-hint),
+  .custom-cart-details p:not(.form-hint),
   .ingredient-line-table p,
   .summary-box p {
     display: grid;
-    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    grid-template-columns: max-content minmax(0, 1fr);
     align-items: start;
     gap: 8px;
   }
 
-  .checkout-form .summary-box p {
-    grid-template-columns: 1fr;
+  .quote-panel span,
+  .shop-card.is-custom-blend .quote-panel span,
+  .custom-cart-details span {
+    display: inline-block;
+    min-width: max-content;
+    writing-mode: horizontal-tb;
+    text-orientation: mixed;
+    overflow-wrap: normal !important;
+    white-space: nowrap;
+    word-break: keep-all !important;
+  }
+
+  .quote-panel .form-hint,
+  .custom-cart-details .form-hint {
+    display: block;
+    margin-top: 2px;
   }
 
   .quote-panel b,
+  .shop-card.is-custom-blend .quote-panel b,
   .custom-cart-details b,
   .ingredient-line-table b,
   .summary-box strong {
@@ -1902,7 +2001,8 @@ footer p {
     overflow-wrap: anywhere;
   }
 
-  .checkout-form .summary-box strong {
+  .ingredient-line-table b,
+  .summary-box strong {
     text-align: left;
   }
 
@@ -1928,7 +2028,7 @@ footer p {
 
   .quantity-stepper {
     display: grid;
-    grid-template-columns: 46px minmax(0, 1fr) 46px;
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
     align-items: center;
     overflow: hidden;
     border: 1px solid var(--line);
@@ -1960,6 +2060,8 @@ footer p {
   }
 
   .remove-line-button {
+    width: 100%;
+    min-height: 46px;
     border: 0;
     border-radius: 14px;
     background: rgba(164, 31, 18, 0.09);
@@ -2000,6 +2102,50 @@ footer p {
     min-height: 54px;
     border-radius: 18px;
     box-shadow: 0 14px 32px rgba(47, 102, 82, 0.26);
+  }
+
+  .shop-actions .cart-link,
+  .shop-actions .checkout-button,
+  .summary-box .cart-link,
+  .summary-box .checkout-button,
+  .ai-action-grid .cart-link,
+  .ai-action-grid .checkout-button {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .admin-layout,
+  .order-detail,
+  .admin-row,
+  .customer-row {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-row-main {
+    display: grid;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .admin-price-control {
+    min-width: 0;
+  }
+
+  .admin-price-control input {
+    width: 100%;
+  }
+
+  .admin-ingredient-header {
+    display: none;
+  }
+
+  .admin-ingredient-row {
+    grid-template-columns: minmax(0, 1fr) minmax(66px, 0.45fr);
+    gap: 8px;
+  }
+
+  .admin-ingredient-row strong {
+    text-align: left;
   }
 
   footer {

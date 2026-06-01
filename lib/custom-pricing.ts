@@ -1,4 +1,4 @@
-import type { CartStoredItem, CustomQuoteSnapshot, CustomRecipeSnapshot } from "./types";
+import type { CartStoredItem, CustomQuotePublicSnapshot, CustomQuoteSnapshot, CustomRecipeSnapshot } from "./types";
 
 export const CUSTOM_BLEND_PRODUCT_ID = "custom-blend";
 export const CUSTOM_DEPOSIT_RATE = 0.7;
@@ -10,7 +10,12 @@ export function customCartKey(productId: string, vendorCode?: string, recipeId?:
   return productId;
 }
 
-export function getCustomBlendWeightJin(quantity: number, quote: CustomQuoteSnapshot) {
+type CustomBlendWeightSnapshot = Pick<
+  CustomQuoteSnapshot | CustomQuotePublicSnapshot,
+  "totalWeightJin" | "minimumQuantityJin" | "minimumQuantityKg"
+>;
+
+export function getCustomBlendWeightJin(quantity: number, quote: CustomBlendWeightSnapshot) {
   return quote.totalWeightJin ?? quote.minimumQuantityJin ?? quantity;
 }
 

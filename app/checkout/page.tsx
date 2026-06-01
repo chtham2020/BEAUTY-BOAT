@@ -4,7 +4,6 @@ import { DELIVERY_METHODS, type CartStoredItem } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
 import {
   calculateBalanceCents,
-  calculateCustomLineTotalCents,
   calculateDepositCents,
   hasNewCustomRecipe,
 } from "@/lib/custom-pricing";
@@ -32,13 +31,16 @@ const copy = {
     orderNote: "訂單備註",
     orderPlaceholder: "例如：客製粉料用途、口味方向、包裝需求",
     deliveryFee: "運輸費",
-    deliveryFeeValue: "Lalamove/Grab 另計，自費領取可為 0",
+    deliveryFeeValue: "Lalamove/Grab 运费另计，自费领取可为 0",
     payment: "付款",
     paymentValue: "店家確認後 PayNow",
-    customSubtotal: "Custom Blend subtotal",
-    deposit: "70% deposit",
-    balance: "30% upon collection",
-    recipePending: "New custom blend quotation pending. 70% deposit is required after quote confirmation.",
+    customSubtotal: "客制粉料小计",
+    deposit: "70% 订金",
+    balance: "取货付余额",
+    repeatCustomBlend: "重复客制粉料",
+    newCustomBlend: "新客客制粉料",
+    recipePending: "新客客制粉料待店家报价；确认报价后需付 70% 订金。",
+    repeatPending: "重复客制粉料已验证；配方和最终金额只保存在福安后台。",
     submitting: "提交中...",
     submit: "提交訂單",
   },
@@ -62,7 +64,10 @@ const copy = {
     customSubtotal: "Custom Blend Subtotal",
     deposit: "70% Deposit",
     balance: "30% Upon Collection",
+    repeatCustomBlend: "Repeat Custom Blend",
+    newCustomBlend: "New Custom Blend",
     recipePending: "New custom blend quotation pending. 70% deposit is required after quote confirmation.",
+    repeatPending: "Repeat custom blend verified. Formula and final amount stay in FOOK ON backend.",
     submitting: "Submitting...",
     submit: "Submit Order",
   },
@@ -84,28 +89,23 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartStoredItem[]>([]);
   const [gstRate, setGstRate] = useState<0 | 9>(0);
-  const [depositRequired, setDepositRequired] = useState(true);
   const t = copy[language];
 
   useEffect(() => {
     const items = readCart();
     setCartItems(items);
-    if (hasNewCustomRecipe(items)) setDepositRequired(true);
   }, []);
 
   const customTotals = useMemo(() => {
-    const customSubtotal = cartItems.reduce((sum, item) => {
-      if (!item.customQuote) return sum;
-      return sum + calculateCustomLineTotalCents(item.quantity, item.customQuote);
-    }, 0);
+    const customSubtotal = 0;
     return {
       customSubtotal,
-      deposit: depositRequired ? calculateDepositCents(customSubtotal) : 0,
-      balance: depositRequired ? calculateBalanceCents(customSubtotal) : customSubtotal,
+      deposit: customSubtotal > 0 ? calculateDepositCents(customSubtotal) : 0,
+      balance: customSubtotal > 0 ? calculateBalanceCents(customSubtotal) : 0,
       hasNewRecipe: hasNewCustomRecipe(cartItems),
+      hasRepeatQuote: cartItems.some((item) => Boolean(item.customQuote)),
     };
-  }, [cartItems, depositRequired]);
-  const hasCustomBlend = customTotals.customSubtotal > 0 || customTotals.hasNewRecipe;
+  }, [cartItems]);
 
   async function submit(formData: FormData) {
     setError("");
@@ -117,7 +117,6 @@ export default function CheckoutPage() {
       return;
     }
 
-    const orderDepositRequired = customTotals.hasNewRecipe ? true : hasCustomBlend ? depositRequired : false;
     const response = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -128,7 +127,7 @@ export default function CheckoutPage() {
         deliveryNote: formData.get("deliveryNote"),
         customerNote: formData.get("customerNote"),
         gstRate,
-        depositRequired: orderDepositRequired,
+        depositRequired: customTotals.hasNewRecipe,
         items,
       }),
     });
@@ -170,7 +169,7 @@ export default function CheckoutPage() {
         </label>
         <label>
           {t.deliveryMethod}
-          <select name="deliveryMethod" required defaultValue="third-party">
+          <select name="deliveryMethod" required defaultValue="self-pickup">
             {DELIVERY_METHODS.map((method) => (
               <option key={method.value} value={method.value}>
                 {language === "en" ? method.en : method.zh}
@@ -185,19 +184,6 @@ export default function CheckoutPage() {
             <option value={9}>9%</option>
           </select>
         </label>
-        {hasCustomBlend && (
-          <label>
-            Custom Blend customer type
-            <select
-              value={depositRequired ? "new" : "repeat"}
-              onChange={(event) => setDepositRequired(event.target.value === "new")}
-              disabled={customTotals.hasNewRecipe}
-            >
-              <option value="new">New customer: 70% deposit applies</option>
-              <option value="repeat">Repeat order: deposit waived</option>
-            </select>
-          </label>
-        )}
         <label>
           {t.deliveryNote}
           <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} required={customTotals.hasNewRecipe} />
@@ -208,7 +194,8 @@ export default function CheckoutPage() {
         </label>
         <div className="summary-box">
           <p><span>GST</span><strong>{gstRate}%</strong></p>
-          {customTotals.hasNewRecipe && <p><span>New Custom Blend</span><strong>{t.recipePending}</strong></p>}
+          {customTotals.hasRepeatQuote && <p><span>{t.repeatCustomBlend}</span><strong>{t.repeatPending}</strong></p>}
+          {customTotals.hasNewRecipe && <p><span>{t.newCustomBlend}</span><strong>{t.recipePending}</strong></p>}
           {customTotals.customSubtotal > 0 && (
             <>
               <p><span>{t.customSubtotal}</span><strong>{formatMoney(customTotals.customSubtotal)}</strong></p>

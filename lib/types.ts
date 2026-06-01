@@ -35,6 +35,18 @@ export type CustomQuoteSnapshot = {
   unitPriceCents: number;
 };
 
+export type CustomQuotePublicSnapshot = {
+  vendorCode: string;
+  blendType: string;
+  ingredientQuantity: string;
+  unit: string;
+  totalWeightJin?: number;
+  minimumQuantityJin?: number;
+  minimumQuantityKg: number;
+  quoteOnly: true;
+  privacyNote: string;
+};
+
 export type CustomRecipeSnapshot = {
   recipeId: string;
   customerType: "new";
@@ -57,7 +69,7 @@ export type CustomRecipeSnapshot = {
 export type CartItem = {
   productId: string;
   quantity: number;
-  customQuote?: CustomQuoteSnapshot;
+  customQuote?: CustomQuotePublicSnapshot;
   customRecipe?: CustomRecipeSnapshot;
   product: PublicProduct;
 };
@@ -65,7 +77,7 @@ export type CartItem = {
 export type CartStoredItem = {
   productId: string;
   quantity: number;
-  customQuote?: CustomQuoteSnapshot;
+  customQuote?: CustomQuotePublicSnapshot;
   customRecipe?: CustomRecipeSnapshot;
 };
 

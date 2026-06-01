@@ -4,15 +4,12 @@ import { formatMoney } from "@/lib/money";
 import {
   CUSTOM_BLEND_MINIMUM_JIN,
   CUSTOM_BLEND_PRODUCT_ID,
-  calculateBalanceCents,
-  calculateCustomLineTotalCents,
-  calculateDepositCents,
   customCartKey,
   getCustomBlendWeightJin,
   getCustomRecipeWeightJin,
   hasNewCustomRecipe,
 } from "@/lib/custom-pricing";
-import type { CartStoredItem, CustomQuoteSnapshot, CustomRecipeSnapshot, PublicProduct } from "@/lib/types";
+import type { CartStoredItem, CustomQuotePublicSnapshot, CustomRecipeSnapshot, PublicProduct } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
 import { MobileBottomTabs } from "../MobileBottomTabs";
 import { Check, House, Plus, ShoppingCart, Square, Trash2 } from "lucide-react";
@@ -33,44 +30,46 @@ type IngredientCatalogItem = {
 
 const copy = {
   zh: {
-    eyebrow: "Hermes Order",
+    eyebrow: "Hermes 订购",
     title: "產品訂購",
     body: "固定價格商品可預估金額；客製粉料會由店家通過 WhatsApp text/電話確認報價。",
     home: "主頁",
     cart: "購物車",
-    inCartStatus: "已加入購物車，到 Shopping Cart 調整數量",
+    inCartStatus: "已加入购物车，请到购物车调整数量",
     unit: "單位",
     stock: "庫存",
     price: "價格",
     quote: "詢價",
     confirm: "需確認",
-    repeatMode: "Repeat vendor code",
-    newMode: "New customer recipe",
-    vendorCode: "Vendor code",
-    vendorPlaceholder: "Enter company vendor code",
-    validateVendor: "Verify code",
-    validating: "Checking...",
-    invalidVendor: "Vendor code not found",
-    quoteReady: "Quotation ready",
-    ingredients: "Ingredients",
-    ingredientName: "Ingredient name",
-    ingredientPlaceholder: "Select or type ingredient",
-    quantityJin: "Quantity 斤",
-    addRow: "Add row",
-    removeRow: "Remove row",
-    recipeNote: "Recipe / packing notes",
-    recipeNotePlaceholder: "Grinding, packing, taste direction, delivery notes",
-    newRecipeHelp: "Minimum 10斤 / 6kg. New custom blend orders require 70% deposit after quotation.",
-    belowMinimum: "Minimum order is 10斤 / 6kg.",
-    exclusive: "New custom blend recipe must be ordered alone. Adding it will replace other cart items.",
-    recipePending: "Final amount pending shop quotation",
-    heatTreatment: "Heat treatment",
-    processSpec: "Baking / grinding spec",
-    minimumQuantity: "Minimum quantity",
+    repeatMode: "重复客户代码",
+    newMode: "新客配方",
+    vendorCode: "客户代码",
+    vendorPlaceholder: "请输入客户代码",
+    validateVendor: "验证代码",
+    validating: "验证中...",
+    invalidVendor: "找不到客户代码",
+    quoteReady: "已验证报价",
+    repeatVerified: "重复客制粉料已验证",
+    ingredients: "材料",
+    ingredientName: "材料名称",
+    ingredientPlaceholder: "选择或输入材料",
+    quantityJin: "数量（斤）",
+    addRow: "新增一行",
+    removeRow: "删除此行",
+    recipeNote: "配方 / 包装备注",
+    recipeNotePlaceholder: "研磨、包装、口味方向、配送备注",
+    newRecipeHelp: "最低 10斤 / 6kg。新客客制粉料报价确认后需付 70% 订金。",
+    belowMinimum: "最低订购量为 10斤 / 6kg。",
+    exclusive: "新客客制粉料必须单独下单；加入后会取代购物车其他商品。",
+    recipePending: "最终金额待店家报价确认",
+    heatTreatment: "热处理",
+    processSpec: "烘焙 / 研磨规格",
+    minimumQuantity: "最低数量",
+    privacyNote: "配方资料已由福安后台保存，公开网页不会显示配方细节。",
     totalWeight: "總重量",
-    grindingCost: "Grinding cost / 斤",
-    deposit: "70% deposit",
-    balance: "30% upon collection",
+    grindingCost: "研磨费 / 斤",
+    deposit: "70% 订金",
+    balance: "取货付余额",
     addToCart: "加入購物車",
   },
   en: {
@@ -93,6 +92,7 @@ const copy = {
     validating: "Checking...",
     invalidVendor: "Vendor code not found",
     quoteReady: "Quotation Ready",
+    repeatVerified: "Repeat custom blend verified",
     ingredients: "Ingredients",
     ingredientName: "Ingredient name",
     ingredientPlaceholder: "Select or type ingredient",
@@ -108,6 +108,7 @@ const copy = {
     heatTreatment: "Heat Treatment",
     processSpec: "Baking / Grinding Spec",
     minimumQuantity: "Minimum Quantity",
+    privacyNote: "Blend formula is kept on file and visible only to FOOK ON backend.",
     totalWeight: "Total Weight",
     grindingCost: "Grinding Cost / jin",
     deposit: "70% Deposit",
@@ -121,6 +122,14 @@ const englishDescriptions: Record<string, string> = {
   "pepper-powder": "Clean peppery lift for soups, meats, cooked foods, and everyday seasoning.",
   "custom-blend": "Custom powder blends matched to usage, taste profile, and volume needs.",
 };
+
+function displayUnit(unit: string, language: "zh" | "en") {
+  if (language === "en") {
+    if (unit === "按需求" || unit === "æŒ‰éœ€æ±‚") return "By request";
+    if (unit === "斤" || unit === "æ–¤") return "jin";
+  }
+  return unit;
+}
 
 function readCart(): CartStoredItem[] {
   if (typeof window === "undefined") return [];
@@ -158,6 +167,11 @@ function makeRecipeSnapshot(lines: RecipeDraftLine[], notes: string): CustomReci
   };
 }
 
+function formatRepeatQuoteQuantity(quote: CustomQuotePublicSnapshot, language: "zh" | "en") {
+  const weightJin = getCustomBlendWeightJin(quote.minimumQuantityJin ?? quote.minimumQuantityKg, quote);
+  return language === "en" ? `${weightJin} jin total, 1 jin = 600g` : `${weightJin}斤（1斤 = 600g）`;
+}
+
 export default function ProductsPage() {
   const { language } = useLanguagePreference();
   const [products, setProducts] = useState<PublicProduct[]>([]);
@@ -165,7 +179,7 @@ export default function ProductsPage() {
   const [selectedCartKeys, setSelectedCartKeys] = useState<string[]>([]);
   const [cartHasNewRecipe, setCartHasNewRecipe] = useState(false);
   const [vendorCodes, setVendorCodes] = useState<Record<string, string>>({});
-  const [vendorQuotes, setVendorQuotes] = useState<Record<string, CustomQuoteSnapshot>>({});
+  const [vendorQuotes, setVendorQuotes] = useState<Record<string, CustomQuotePublicSnapshot>>({});
   const [vendorErrors, setVendorErrors] = useState<Record<string, string>>({});
   const [validatingCodes, setValidatingCodes] = useState<Record<string, boolean>>({});
   const [ingredientCatalog, setIngredientCatalog] = useState<IngredientCatalogItem[]>([]);
@@ -207,14 +221,15 @@ export default function ProductsPage() {
     setCartHasNewRecipe(hasNewCustomRecipe(cart));
     setSelectedCartKeys(cart.map((item) => customCartKey(item.productId, item.customQuote?.vendorCode, item.customRecipe?.recipeId)));
     for (const item of cart) {
-      if (item.productId === CUSTOM_BLEND_PRODUCT_ID && item.customQuote) {
-        setVendorCodes((current) => ({ ...current, [item.productId]: item.customQuote?.vendorCode ?? "" }));
-        setVendorQuotes((current) => ({ ...current, [item.productId]: item.customQuote as CustomQuoteSnapshot }));
+      const quote = item.customQuote;
+      if (item.productId === CUSTOM_BLEND_PRODUCT_ID && quote) {
+        setVendorCodes((current) => ({ ...current, [item.productId]: quote.vendorCode }));
+        setVendorQuotes((current) => ({ ...current, [item.productId]: quote }));
       }
     }
   }
 
-  function toggleCartItem(product: PublicProduct, customQuote?: CustomQuoteSnapshot) {
+  function toggleCartItem(product: PublicProduct, customQuote?: CustomQuotePublicSnapshot) {
     const cart = readCart();
     const key = customCartKey(product.id, customQuote?.vendorCode);
     const existing = cart.find((item) => customCartKey(item.productId, item.customQuote?.vendorCode, item.customRecipe?.recipeId) === key);
@@ -279,7 +294,7 @@ export default function ProductsPage() {
       return;
     }
 
-    const quote: CustomQuoteSnapshot = await response.json();
+    const quote: CustomQuotePublicSnapshot = await response.json();
     setVendorQuotes((current) => ({ ...current, [productId]: quote }));
     setVendorCodes((current) => ({ ...current, [productId]: quote.vendorCode }));
   }
@@ -317,8 +332,6 @@ export default function ProductsPage() {
           const supportName = language === "en" ? product.nameZh : product.nameEn;
           const description =
             language === "en" ? englishDescriptions[product.id] ?? product.description : product.description;
-          const sampleLineTotal = quote ? calculateCustomLineTotalCents(quote.minimumQuantityKg, quote) : 0;
-
           return (
             <article
               className={`shop-card${product.image ? " has-product-image" : ""}${isCustomBlend ? " is-custom-blend" : ""}${isSelected ? " is-in-cart" : ""}`}
@@ -338,7 +351,7 @@ export default function ProductsPage() {
                 <dl>
                   <div>
                     <dt>{t.unit}</dt>
-                    <dd>{product.unit}</dd>
+                    <dd>{displayUnit(product.unit, language)}</dd>
                   </div>
                   <div>
                     <dt>{t.stock}</dt>
@@ -346,7 +359,7 @@ export default function ProductsPage() {
                   </div>
                   <div>
                     <dt>{t.price}</dt>
-                    <dd>{quote ? formatMoney(quote.unitPriceCents) : product.quoteOnly ? t.quote : formatMoney(product.priceCents)}</dd>
+                    <dd>{quote ? t.recipePending : product.quoteOnly ? t.quote : formatMoney(product.priceCents)}</dd>
                   </div>
                 </dl>
                 {isCustomBlend && (
@@ -484,33 +497,11 @@ export default function ProductsPage() {
                     {customMode === "repeat" && quote && (
                       <div className="quote-panel">
                         <strong>{t.quoteReady}: {quote.vendorCode}</strong>
-                        <p>{quote.vendorName} · {quote.blendType}</p>
-                        <p><span>{t.ingredients}</span><b>{quote.ingredients.join(", ")}</b></p>
-                        {quote.ingredientLines && (
-                          <div className="ingredient-line-table">
-                            {quote.ingredientLines.map((ingredient) => (
-                              <p key={ingredient.name}>
-                                <span>{ingredient.name}</span>
-                                <b>
-                                  {ingredient.quantityJin}斤
-                                  {ingredient.unitPriceCents != null && ` × ${formatMoney(ingredient.unitPriceCents)}`}
-                                  {ingredient.lineTotalCents != null && ` = ${formatMoney(ingredient.lineTotalCents)}`}
-                                </b>
-                              </p>
-                            ))}
-                            <p className="ingredient-total-row">
-                              <span>{t.totalWeight}</span>
-                              <b>{getCustomBlendWeightJin(quote.minimumQuantityJin ?? quote.minimumQuantityKg, quote)}斤</b>
-                            </p>
-                          </div>
-                        )}
-                        <p><span>{t.unit}</span><b>{quote.ingredientQuantity}</b></p>
-                        <p><span>{t.heatTreatment}</span><b>{quote.heatTreatment}</b></p>
-                        <p><span>{t.processSpec}</span><b>{quote.processSpec}</b></p>
+                        <p>{t.repeatVerified}</p>
+                        <p><span>{t.unit}</span><b>{formatRepeatQuoteQuantity(quote, language)}</b></p>
                         <p><span>{t.minimumQuantity}</span><b>{getCustomBlendWeightJin(quote.minimumQuantityJin ?? quote.minimumQuantityKg, quote)}斤</b></p>
-                        <p><span>{t.grindingCost}</span><b>{formatMoney(quote.grindingCostPerJinCents ?? quote.grindingCostPer600gCents)} / 斤</b></p>
-                        <p><span>{t.deposit}</span><b>{formatMoney(calculateDepositCents(sampleLineTotal))}</b></p>
-                        <p><span>{t.balance}</span><b>{formatMoney(calculateBalanceCents(sampleLineTotal))}</b></p>
+                        <p><span>{t.price}</span><b>{t.recipePending}</b></p>
+                        <p className="form-hint">{t.privacyNote}</p>
                       </div>
                     )}
                   </div>

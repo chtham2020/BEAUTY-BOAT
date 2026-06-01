@@ -23,5 +23,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Vendor code not found" }, { status: 404 });
   }
 
-  return NextResponse.json(quote);
+  const weightJin = quote.totalWeightJin ?? quote.minimumQuantityJin ?? quote.minimumQuantityKg;
+
+  return NextResponse.json({
+    vendorCode: quote.vendorCode,
+    blendType: "Repeat custom blend verified",
+    ingredientQuantity: `${weightJin}斤 total, 1斤 = 600g`,
+    unit: quote.unit,
+    totalWeightJin: weightJin,
+    minimumQuantityJin: quote.minimumQuantityJin ?? weightJin,
+    minimumQuantityKg: quote.minimumQuantityKg,
+    quoteOnly: true,
+    privacyNote: "Blend formula is kept on file and visible only to FOOK ON backend.",
+  });
 }

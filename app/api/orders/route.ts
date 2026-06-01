@@ -41,7 +41,7 @@ const orderSchema = z.object({
   deliveryMethod: z.enum(["third-party", "self-pickup"]),
   deliveryNote: z.string().optional(),
   gstRate: z.union([z.literal(0), z.literal(9)]).default(0),
-  depositRequired: z.boolean().default(true),
+  depositRequired: z.boolean().default(false),
   items: z
     .array(
       z.object({
@@ -57,6 +57,47 @@ const orderSchema = z.object({
     )
     .min(1),
 });
+
+function clean(value: string | undefined | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+async function saveCustomerSnapshot(order: z.infer<typeof orderSchema>) {
+  const customerName = order.customerName.trim();
+  const customerPhone = order.customerPhone.trim();
+  const deliveryNote = clean(order.deliveryNote);
+  const customerNote = clean(order.customerNote);
+  const existing = await prisma.customer.findFirst({
+    where: {
+      OR: [
+        { phone: customerPhone },
+        {
+          nameZh: customerName,
+          addressLine1: deliveryNote,
+        },
+      ],
+    },
+    orderBy: { updatedAt: "desc" },
+  });
+
+  const data = {
+    nameZh: customerName,
+    phone: customerPhone,
+    addressLine1: deliveryNote,
+    notes: customerNote,
+    active: true,
+  };
+
+  if (existing) {
+    return prisma.customer.update({
+      where: { id: existing.id },
+      data,
+    });
+  }
+
+  return prisma.customer.create({ data });
+}
 
 export async function POST(request: Request) {
   const parsed = orderSchema.safeParse(await request.json());
@@ -129,12 +170,12 @@ export async function POST(request: Request) {
     const hasQuoteItems = lines.some(
       (line) => Boolean(line.customRecipe) || (!line.customQuote && (line.product.quoteOnly || line.product.priceCents == null)),
     );
-    const hasCustomBlendItems = lines.some((line) => line.customQuote || line.customRecipe);
-    const depositRequired = customRecipeItems.length > 0 ? true : hasCustomBlendItems ? parsed.data.depositRequired : false;
+    const depositRequired = customRecipeItems.length > 0;
     const gstCents = calculateGstWithRate(subtotalCents, parsed.data.gstRate);
     const finalTotalCents = hasQuoteItems ? null : subtotalCents + gstCents;
     const orderNumber = makeOrderNumber();
     const deliveryLabel = parsed.data.deliveryMethod === "self-pickup" ? "Self pickup" : "Lalamove / Grab delivery";
+    const customer = await saveCustomerSnapshot(parsed.data);
     const followUpText = makeFollowUpText({
       orderNumber,
       customerName: parsed.data.customerName,
@@ -151,6 +192,7 @@ export async function POST(request: Request) {
         orderNumber,
         customerName: parsed.data.customerName,
         customerPhone: parsed.data.customerPhone,
+        customerId: customer.id,
         customerNote: parsed.data.customerNote,
         deliveryMethod: parsed.data.deliveryMethod,
         deliveryNote: parsed.data.deliveryNote,

@@ -1,12 +1,11 @@
 "use client";
 
 import { calculateGst, formatMoney } from "@/lib/money";
-import type { CartItem, CartStoredItem, PublicProduct } from "@/lib/types";
+import type { CartItem, CartStoredItem, CustomQuotePublicSnapshot, PublicProduct } from "@/lib/types";
 import { useLanguagePreference } from "@/lib/language";
 import {
   CUSTOM_BLEND_PRODUCT_ID,
   calculateBalanceCents,
-  calculateCustomLineTotalCents,
   calculateDepositCents,
   customCartKey,
   getCustomBlendWeightJin,
@@ -33,18 +32,19 @@ const copy = {
     separate: "另計",
     estimatedTotal: "預計合計",
     finalPending: "最終金額待確認",
-    vendorCode: "Vendor code",
+    vendorCode: "客户代码",
     price: "價格",
-    ingredients: "Ingredients",
-    heatTreatment: "Heat treatment",
-    processSpec: "Baking / grinding spec",
-    minimumQuantity: "Minimum quantity",
+    ingredients: "材料",
+    heatTreatment: "热处理",
+    processSpec: "烘焙 / 研磨规格",
+    minimumQuantity: "最低数量",
+    privacyNote: "配方资料已由福安后台保存，公开网页不会显示配方细节。",
     totalWeight: "總重量",
-    grindingCost: "Grinding cost",
-    deposit: "70% deposit",
-    balance: "30% upon collection",
-    customSubtotal: "Custom Blend subtotal",
-    recipePending: "Final amount pending shop quotation",
+    grindingCost: "研磨费",
+    deposit: "70% 订金",
+    balance: "取货付余额",
+    customSubtotal: "客制粉料小计",
+    recipePending: "最终金额待店家报价确认",
     checkout: "前往結帳",
   },
   en: {
@@ -67,6 +67,7 @@ const copy = {
     heatTreatment: "Heat Treatment",
     processSpec: "Baking / Grinding Spec",
     minimumQuantity: "Minimum Quantity",
+    privacyNote: "Blend formula is kept on file and visible only to FOOK ON backend.",
     totalWeight: "Total Weight",
     grindingCost: "Grinding Cost",
     deposit: "70% Deposit",
@@ -97,6 +98,19 @@ function storedItems(items: CartItem[]): CartStoredItem[] {
     customQuote,
     customRecipe,
   }));
+}
+
+function displayUnit(unit: string, language: "zh" | "en") {
+  if (language === "en") {
+    if (unit === "按需求" || unit === "æŒ‰éœ€æ±‚") return "By request";
+    if (unit === "斤" || unit === "æ–¤") return "jin";
+  }
+  return unit;
+}
+
+function formatRepeatQuoteQuantity(quote: CustomQuotePublicSnapshot, quantity: number, language: "zh" | "en") {
+  const weightJin = getCustomBlendWeightJin(quantity, quote);
+  return language === "en" ? `${weightJin} jin total, 1 jin = 600g` : `${weightJin}斤（1斤 = 600g）`;
 }
 
 export default function CartPage() {
@@ -147,21 +161,18 @@ export default function CartPage() {
 
   const totals = useMemo(() => {
     const subtotal = items.reduce((sum, item) => {
-      if (item.customQuote) return sum + calculateCustomLineTotalCents(item.quantity, item.customQuote);
+      if (item.customQuote) return sum;
       if (item.customRecipe || item.product.quoteOnly || item.product.priceCents == null) return sum;
       return sum + item.product.priceCents * item.quantity;
     }, 0);
-    const customSubtotal = items.reduce((sum, item) => {
-      if (!item.customQuote) return sum;
-      return sum + calculateCustomLineTotalCents(item.quantity, item.customQuote);
-    }, 0);
+    const customSubtotal = 0;
     return {
       subtotal,
       gst: calculateGst(subtotal),
       customSubtotal,
       deposit: calculateDepositCents(customSubtotal),
       balance: calculateBalanceCents(customSubtotal),
-      hasQuote: items.some((item) => item.customRecipe || (!item.customQuote && (item.product.quoteOnly || item.product.priceCents == null))),
+      hasQuote: items.some((item) => item.customQuote || item.customRecipe || (item.product.quoteOnly || item.product.priceCents == null)),
     };
   }, [items]);
 
@@ -199,10 +210,10 @@ export default function CartPage() {
               <article className="cart-line" key={itemKey}>
                 <div>
                   <h2>{language === "en" ? item.product.nameEn : item.product.nameZh}</h2>
-                  <p>{language === "en" ? item.product.nameZh : item.product.nameEn} · {item.product.unit}</p>
+                  <p>{language === "en" ? item.product.nameZh : item.product.nameEn} · {displayUnit(item.product.unit, language)}</p>
                   <strong>
                     {item.customQuote
-                      ? formatMoney(calculateCustomLineTotalCents(item.quantity, item.customQuote))
+                      ? t.recipePending
                       : item.customRecipe
                         ? t.recipePending
                         : item.product.quoteOnly
@@ -211,30 +222,10 @@ export default function CartPage() {
                   </strong>
                   {item.customQuote && (
                     <div className="custom-cart-details">
-                      <p><span>{t.vendorCode}</span><b>{item.customQuote.vendorCode} · {item.customQuote.vendorName}</b></p>
-                      <p><span>{t.ingredients}</span><b>{item.customQuote.ingredients.join(", ")}</b></p>
-                      {item.customQuote.ingredientLines && (
-                        <div className="ingredient-line-table">
-                          {item.customQuote.ingredientLines.map((ingredient) => (
-                            <p key={ingredient.name}>
-                              <span>{ingredient.name}</span>
-                              <b>
-                                {ingredient.quantityJin}斤
-                                {ingredient.unitPriceCents != null && ` × ${formatMoney(ingredient.unitPriceCents)}`}
-                                {ingredient.lineTotalCents != null && ` = ${formatMoney(ingredient.lineTotalCents)}`}
-                              </b>
-                            </p>
-                          ))}
-                          <p className="ingredient-total-row">
-                            <span>{t.totalWeight}</span>
-                            <b>{getCustomBlendWeightJin(item.quantity, item.customQuote)}斤</b>
-                          </p>
-                        </div>
-                      )}
-                      <p><span>{t.heatTreatment}</span><b>{item.customQuote.heatTreatment}</b></p>
-                      <p><span>{t.processSpec}</span><b>{item.customQuote.processSpec}</b></p>
-                      <p><span>{t.minimumQuantity}</span><b>{getCustomBlendWeightJin(item.quantity, item.customQuote)}斤</b></p>
-                      <p><span>{t.grindingCost}</span><b>{formatMoney(item.customQuote.grindingCostPerJinCents ?? item.customQuote.grindingCostPer600gCents)} / 斤</b></p>
+                      <p><span>{t.vendorCode}</span><b>{item.customQuote.vendorCode}</b></p>
+                      <p><span>{t.minimumQuantity}</span><b>{formatRepeatQuoteQuantity(item.customQuote, item.quantity, language)}</b></p>
+                      <p><span>{t.price}</span><b>{t.recipePending}</b></p>
+                      <p className="form-hint">{t.privacyNote}</p>
                     </div>
                   )}
                   {item.customRecipe && (

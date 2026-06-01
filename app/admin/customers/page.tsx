@@ -1,5 +1,6 @@
 "use client";
 
+import { useLanguagePreference } from "@/lib/language";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -39,12 +40,72 @@ const emptyForm: CustomerForm = {
   notes: "",
 };
 
+const copy = {
+  zh: {
+    eyebrow: "Hermes 后台",
+    title: "客户资料",
+    body: "Bill To 客户名单，用于重复订单和沽单 / Cash Sale invoice。客户下单后会自动保存姓名、电话 / WhatsApp 和地址备注。",
+    orders: "订单",
+    products: "产品库存",
+    noEnglishName: "没有英文名",
+    noPhone: "没有电话",
+    orderCount: "笔订单",
+    edit: "编辑",
+    disable: "停用",
+    enable: "启用",
+    editCustomer: "编辑客户",
+    newCustomer: "新增客户",
+    nameZh: "中文 / 公司名称",
+    nameEn: "英文名",
+    address1: "地址 1",
+    address2: "地址 2",
+    postalCode: "Postal code",
+    phone: "电话 / WhatsApp",
+    email: "Email",
+    notes: "备注",
+    saveCustomer: "保存客户",
+    addCustomer: "新增客户",
+    cancelEdit: "取消编辑",
+    switchLabel: "Switch to English",
+  },
+  en: {
+    eyebrow: "Hermes Admin",
+    title: "Customer Records",
+    body: "Bill To customer list for repeat orders and Cash Sale invoices. New orders automatically save customer name, phone / WhatsApp, and address notes.",
+    orders: "Orders",
+    products: "Products",
+    noEnglishName: "No English name",
+    noPhone: "No phone",
+    orderCount: "orders",
+    edit: "Edit",
+    disable: "Disable",
+    enable: "Enable",
+    editCustomer: "Edit Customer",
+    newCustomer: "New Customer",
+    nameZh: "Chinese / Company Name",
+    nameEn: "English Name",
+    address1: "Address 1",
+    address2: "Address 2",
+    postalCode: "Postal code",
+    phone: "Phone / WhatsApp",
+    email: "Email",
+    notes: "Notes",
+    saveCustomer: "Save Customer",
+    addCustomer: "Add Customer",
+    cancelEdit: "Cancel Edit",
+    switchLabel: "切换到中文",
+  },
+};
+
 function clean(value: string) {
   const trimmed = value.trim();
   return trimmed ? trimmed : null;
 }
 
 export default function AdminCustomersPage() {
+  const { language, setLanguage } = useLanguagePreference();
+  const otherLanguage = language === "zh" ? "en" : "zh";
+  const t = copy[language];
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [form, setForm] = useState<CustomerForm>(emptyForm);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -112,13 +173,22 @@ export default function AdminCustomersPage() {
     <main className="shop-page">
       <header className="shop-header">
         <div>
-          <p className="eyebrow">Hermes Admin</p>
-          <h1>客户资料</h1>
-          <p>Bill To 客户名单，用于重复订单和沽单 / Cash Sale invoice。</p>
+          <p className="eyebrow">{t.eyebrow}</p>
+          <h1>{t.title}</h1>
+          <p>{t.body}</p>
         </div>
         <div className="shop-actions">
-          <Link className="cart-link" href="/admin/orders">订单</Link>
-          <Link className="cart-link" href="/admin/products">产品库存</Link>
+          <button
+            className="language-toggle admin-language-toggle"
+            type="button"
+            onClick={() => setLanguage(otherLanguage)}
+            aria-label={t.switchLabel}
+          >
+            <span className={language === "zh" ? "is-active" : ""}>中文</span>
+            <span className={language === "en" ? "is-active" : ""}>EN</span>
+          </button>
+          <Link className="cart-link" href="/admin/orders">{t.orders}</Link>
+          <Link className="cart-link" href="/admin/products">{t.products}</Link>
         </div>
       </header>
 
@@ -127,30 +197,30 @@ export default function AdminCustomersPage() {
           {customers.map((customer) => (
             <article className="admin-row customer-row" key={customer.id}>
               <div>
-                <h2>{customer.nameZh}</h2>
-                <p>{customer.nameEn || "No English name"}</p>
+                <h2>{language === "en" ? customer.nameEn || customer.nameZh : customer.nameZh}</h2>
+                <p>{customer.nameEn || t.noEnglishName}</p>
                 <p>{[customer.addressLine1, customer.addressLine2, customer.postalCode].filter(Boolean).join(", ")}</p>
-                <p>{customer.phone || "No phone"} · {customer._count?.orders ?? 0} orders</p>
+                <p>{customer.phone || t.noPhone} · {customer._count?.orders ?? 0} {t.orderCount}</p>
               </div>
-              <button type="button" onClick={() => startEdit(customer)}>编辑</button>
+              <button type="button" onClick={() => startEdit(customer)}>{t.edit}</button>
               <button type="button" onClick={() => toggleActive(customer)}>
-                {customer.active ? "停用" : "启用"}
+                {customer.active ? t.disable : t.enable}
               </button>
             </article>
           ))}
         </div>
 
         <form className="checkout-form" action={saveCustomer}>
-          <h2>{editingId ? "编辑客户" : "新增客户"}</h2>
-          <label>中文 / 公司名<input value={form.nameZh} onChange={(e) => setForm({ ...form, nameZh: e.target.value })} required /></label>
-          <label>英文名<input value={form.nameEn} onChange={(e) => setForm({ ...form, nameEn: e.target.value })} /></label>
-          <label>地址 1<input value={form.addressLine1} onChange={(e) => setForm({ ...form, addressLine1: e.target.value })} /></label>
-          <label>地址 2<input value={form.addressLine2} onChange={(e) => setForm({ ...form, addressLine2: e.target.value })} /></label>
-          <label>Postal code<input value={form.postalCode} onChange={(e) => setForm({ ...form, postalCode: e.target.value })} /></label>
-          <label>电话<input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} /></label>
-          <label>Email<input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} /></label>
-          <label>备注<textarea rows={3} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></label>
-          <button className="checkout-button" type="submit">{editingId ? "保存客户" : "新增客户"}</button>
+          <h2>{editingId ? t.editCustomer : t.newCustomer}</h2>
+          <label>{t.nameZh}<input value={form.nameZh} onChange={(event) => setForm({ ...form, nameZh: event.target.value })} required /></label>
+          <label>{t.nameEn}<input value={form.nameEn} onChange={(event) => setForm({ ...form, nameEn: event.target.value })} /></label>
+          <label>{t.address1}<input value={form.addressLine1} onChange={(event) => setForm({ ...form, addressLine1: event.target.value })} /></label>
+          <label>{t.address2}<input value={form.addressLine2} onChange={(event) => setForm({ ...form, addressLine2: event.target.value })} /></label>
+          <label>{t.postalCode}<input value={form.postalCode} onChange={(event) => setForm({ ...form, postalCode: event.target.value })} /></label>
+          <label>{t.phone}<input value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></label>
+          <label>{t.email}<input value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></label>
+          <label>{t.notes}<textarea rows={3} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} /></label>
+          <button className="checkout-button" type="submit">{editingId ? t.saveCustomer : t.addCustomer}</button>
           {editingId && (
             <button
               className="cart-link"
@@ -160,7 +230,7 @@ export default function AdminCustomersPage() {
                 setForm(emptyForm);
               }}
             >
-              取消编辑
+              {t.cancelEdit}
             </button>
           )}
         </form>
