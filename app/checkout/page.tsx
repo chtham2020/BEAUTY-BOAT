@@ -1,13 +1,13 @@
 "use client";
 
-import { DELIVERY_METHODS, type CartStoredItem } from "@/lib/types";
-import { useLanguagePreference } from "@/lib/language";
 import {
   calculateBalanceCents,
   calculateDepositCents,
   hasNewCustomRecipe,
 } from "@/lib/custom-pricing";
+import { useLanguagePreference } from "@/lib/language";
 import { formatMoney } from "@/lib/money";
+import { DELIVERY_METHODS, type CartStoredItem } from "@/lib/types";
 import { House } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -16,6 +16,22 @@ import { MobileBottomTabs } from "../MobileBottomTabs";
 
 const CART_KEY = "beauty_boat_cart";
 
+type CheckoutProfile = {
+  customerName: string;
+  customerPhone: string;
+  deliveryNote: string;
+};
+
+type CustomerOption = {
+  id: string;
+  nameZh: string;
+  nameEn: string | null;
+  addressLine1: string | null;
+  addressLine2: string | null;
+  postalCode: string | null;
+  phone: string | null;
+};
+
 const copy = {
   zh: {
     title: "提交訂單",
@@ -23,6 +39,8 @@ const copy = {
     home: "主頁",
     emptyCart: "購物車是空的。",
     submitFailed: "訂單提交失敗，請檢查資料或稍後再試。",
+    savedCustomer: "客戶資料",
+    savedCustomerPlaceholder: "選擇已保存客戶",
     name: "姓名或公司名稱",
     phone: "電話 / WhatsApp",
     deliveryMethod: "運輸方式",
@@ -31,16 +49,16 @@ const copy = {
     orderNote: "訂單備註",
     orderPlaceholder: "例如：客製粉料用途、口味方向、包裝需求",
     deliveryFee: "運輸費",
-    deliveryFeeValue: "Lalamove/Grab 运费另计，自费领取可为 0",
+    deliveryFeeValue: "Lalamove/Grab 運費另計，自費領取可為 0",
     payment: "付款",
     paymentValue: "店家確認後 PayNow",
-    customSubtotal: "客制粉料小计",
-    deposit: "70% 订金",
-    balance: "取货付余额",
-    repeatCustomBlend: "重复客制粉料",
-    newCustomBlend: "新客客制粉料",
-    recipePending: "新客客制粉料待店家报价；确认报价后需付 70% 订金。",
-    repeatPending: "重复客制粉料已验证；配方和最终金额只保存在福安后台。",
+    customSubtotal: "客製粉料小計",
+    deposit: "70% 訂金",
+    balance: "取貨付餘額",
+    repeatCustomBlend: "重複客製粉料",
+    newCustomBlend: "新客客製粉料",
+    recipePending: "新客客製粉料待店家報價；確認報價後需付 70% 訂金。",
+    repeatPending: "重複客製粉料已驗證；配方和最終金額只保存在福安後台。",
     submitting: "提交中...",
     submit: "提交訂單",
   },
@@ -50,6 +68,8 @@ const copy = {
     home: "Home",
     emptyCart: "Shopping Cart is empty.",
     submitFailed: "Order submission failed. Please check your details or try again later.",
+    savedCustomer: "Customer Record",
+    savedCustomerPlaceholder: "Select saved customer",
     name: "Name or Company Name",
     phone: "Phone / WhatsApp",
     deliveryMethod: "Delivery Method",
@@ -82,18 +102,30 @@ function readCart(): CartStoredItem[] {
   }
 }
 
+function customerAddress(customer: CustomerOption) {
+  return [customer.addressLine1, customer.addressLine2, customer.postalCode].filter(Boolean).join(", ");
+}
+
 export default function CheckoutPage() {
   const { language } = useLanguagePreference();
   const router = useRouter();
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [cartItems, setCartItems] = useState<CartStoredItem[]>([]);
+  const [customerOptions, setCustomerOptions] = useState<CustomerOption[]>([]);
+  const [profile, setProfile] = useState<CheckoutProfile>({ customerName: "", customerPhone: "", deliveryNote: "" });
   const [gstRate, setGstRate] = useState<0 | 9>(0);
   const t = copy[language];
 
   useEffect(() => {
-    const items = readCart();
-    setCartItems(items);
+    setCartItems(readCart());
+    window.localStorage.removeItem("beauty_boat_checkout_profile");
+    fetch("/api/admin/customers")
+      .then((response) => (response.ok ? response.json() : []))
+      .then((customers: CustomerOption[]) => {
+        setCustomerOptions(customers.filter((customer) => customer.phone || customer.addressLine1));
+      })
+      .catch(() => setCustomerOptions([]));
   }, []);
 
   const customTotals = useMemo(() => {
@@ -107,6 +139,16 @@ export default function CheckoutPage() {
     };
   }, [cartItems]);
 
+  function selectCustomer(customerId: string) {
+    const customer = customerOptions.find((option) => option.id === customerId);
+    if (!customer) return;
+    setProfile({
+      customerName: language === "en" && customer.nameEn ? customer.nameEn : customer.nameZh,
+      customerPhone: customer.phone ?? "",
+      deliveryNote: customerAddress(customer),
+    });
+  }
+
   async function submit(formData: FormData) {
     setError("");
     setLoading(true);
@@ -117,14 +159,17 @@ export default function CheckoutPage() {
       return;
     }
 
+    const checkoutProfile = {
+      customerName: String(formData.get("customerName") || ""),
+      customerPhone: String(formData.get("customerPhone") || ""),
+      deliveryNote: String(formData.get("deliveryNote") || ""),
+    };
     const response = await fetch("/api/orders", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        customerName: formData.get("customerName"),
-        customerPhone: formData.get("customerPhone"),
+        ...checkoutProfile,
         deliveryMethod: formData.get("deliveryMethod"),
-        deliveryNote: formData.get("deliveryNote"),
         customerNote: formData.get("customerNote"),
         gstRate,
         depositRequired: customTotals.hasNewRecipe,
@@ -140,6 +185,9 @@ export default function CheckoutPage() {
     }
 
     const data = await response.json();
+    setProfile({ customerName: "", customerPhone: "", deliveryNote: "" });
+    setCustomerOptions([]);
+    window.localStorage.removeItem("beauty_boat_checkout_profile");
     window.localStorage.removeItem(CART_KEY);
     router.push(`/order/success?order=${encodeURIComponent(data.orderNumber)}`);
   }
@@ -159,13 +207,38 @@ export default function CheckoutPage() {
       </header>
 
       <form className="checkout-form mobile-sticky-form" action={submit}>
+        {customerOptions.length > 0 && (
+          <label>
+            {t.savedCustomer}
+            <select defaultValue="" onChange={(event) => selectCustomer(event.target.value)}>
+              <option value="">{t.savedCustomerPlaceholder}</option>
+              {customerOptions.map((customer) => (
+                <option key={customer.id} value={customer.id}>
+                  {customer.nameZh} {customer.phone ? `- ${customer.phone}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label>
           {t.name}
-          <input name="customerName" required />
+          <input
+            name="customerName"
+            value={profile.customerName}
+            onChange={(event) => setProfile((current) => ({ ...current, customerName: event.target.value }))}
+            autoComplete="name"
+            required
+          />
         </label>
         <label>
           {t.phone}
-          <input name="customerPhone" required />
+          <input
+            name="customerPhone"
+            value={profile.customerPhone}
+            onChange={(event) => setProfile((current) => ({ ...current, customerPhone: event.target.value }))}
+            autoComplete="tel"
+            required
+          />
         </label>
         <label>
           {t.deliveryMethod}
@@ -186,25 +259,61 @@ export default function CheckoutPage() {
         </label>
         <label>
           {t.deliveryNote}
-          <textarea name="deliveryNote" rows={3} placeholder={t.deliveryPlaceholder} required={customTotals.hasNewRecipe} />
+          <textarea
+            name="deliveryNote"
+            rows={3}
+            value={profile.deliveryNote}
+            onChange={(event) => setProfile((current) => ({ ...current, deliveryNote: event.target.value }))}
+            placeholder={t.deliveryPlaceholder}
+            autoComplete="street-address"
+            required={customTotals.hasNewRecipe}
+          />
         </label>
         <label>
           {t.orderNote}
           <textarea name="customerNote" rows={4} placeholder={t.orderPlaceholder} />
         </label>
         <div className="summary-box">
-          <p><span>GST</span><strong>{gstRate}%</strong></p>
-          {customTotals.hasRepeatQuote && <p><span>{t.repeatCustomBlend}</span><strong>{t.repeatPending}</strong></p>}
-          {customTotals.hasNewRecipe && <p><span>{t.newCustomBlend}</span><strong>{t.recipePending}</strong></p>}
+          <p>
+            <span>GST</span>
+            <strong>{gstRate}%</strong>
+          </p>
+          {customTotals.hasRepeatQuote && (
+            <p>
+              <span>{t.repeatCustomBlend}</span>
+              <strong>{t.repeatPending}</strong>
+            </p>
+          )}
+          {customTotals.hasNewRecipe && (
+            <p>
+              <span>{t.newCustomBlend}</span>
+              <strong>{t.recipePending}</strong>
+            </p>
+          )}
           {customTotals.customSubtotal > 0 && (
             <>
-              <p><span>{t.customSubtotal}</span><strong>{formatMoney(customTotals.customSubtotal)}</strong></p>
-              <p><span>{t.deposit}</span><strong>{formatMoney(customTotals.deposit)}</strong></p>
-              <p><span>{t.balance}</span><strong>{formatMoney(customTotals.balance)}</strong></p>
+              <p>
+                <span>{t.customSubtotal}</span>
+                <strong>{formatMoney(customTotals.customSubtotal)}</strong>
+              </p>
+              <p>
+                <span>{t.deposit}</span>
+                <strong>{formatMoney(customTotals.deposit)}</strong>
+              </p>
+              <p>
+                <span>{t.balance}</span>
+                <strong>{formatMoney(customTotals.balance)}</strong>
+              </p>
             </>
           )}
-          <p><span>{t.deliveryFee}</span><strong>{t.deliveryFeeValue}</strong></p>
-          <p><span>{t.payment}</span><strong>{t.paymentValue}</strong></p>
+          <p>
+            <span>{t.deliveryFee}</span>
+            <strong>{t.deliveryFeeValue}</strong>
+          </p>
+          <p>
+            <span>{t.payment}</span>
+            <strong>{t.paymentValue}</strong>
+          </p>
         </div>
         {error && <p className="form-error">{error}</p>}
         <button className="checkout-button mobile-sticky-submit" type="submit" disabled={loading}>
