@@ -58,11 +58,33 @@
 ## Hermes AI Experiment
 - AI features live only in the `codex/hermes-ai-assistant` worktree until merged.
 - Use server-side AI credentials only; never expose API keys to browser code.
-- `AI_PROVIDER` may be `openai`, `deepseek`, or `deepseek-anthropic` in this experiment.
-- For OpenAI, use `OPENAI_API_KEY` and `OPENAI_MODEL`; for DeepSeek, use `DEEPSEEK_API_KEY`, `DEEPSEEK_MODEL`, and `DEEPSEEK_BASE_URL`.
-- For DeepSeek Anthropic-compatible mode, use `DEEPSEEK_API_KEY`, `DEEPSEEK_ANTHROPIC_MODEL`, and `DEEPSEEK_ANTHROPIC_BASE_URL=https://api.deepseek.com/anthropic`.
+- Deprecated: do not use `openai` or `deepseek-anthropic`; see "Hermes AI + Telegram Current Rules" below.
+- Current valid AI providers are `ollama` and `deepseek`.
+- DeepSeek must use direct `https://api.deepseek.com`; do not use `/anthropic`.
 - `AI_API_KEY` and `AI_MODEL` may be used as generic fallbacks when testing one provider at a time.
 - AI may generate WhatsApp drafts, internal order summaries, and custom blend quote/supplier inquiry drafts.
 - AI output is always a draft for the shop to review; never auto-send WhatsApp, never auto-mark payment, and never auto-confirm delivery fees.
 - Send minimum order context to the model: order number, customer name, item summary, totals, delivery method, quote/vendor details, and customer note. Do not send customer phone unless a future feature explicitly requires it.
 - AI output must follow brand rules and must not use 「美人丹」, 「美人洲」, or 「源记」.
+# Hermes AI + Telegram Current Rules
+- Hermes AI supports only `AI_PROVIDER=ollama` and `AI_PROVIDER=deepseek`.
+- `openai` and `deepseek-anthropic` are no longer valid Hermes provider choices; unsupported providers should return a clear admin error.
+- Local Qwen uses Ollama from the server side only:
+  - `OLLAMA_BASE_URL=http://127.0.0.1:11434`
+  - `OLLAMA_MODEL=qwen2.5:14b`
+  - `qwen2.5:3b` may be used as a faster local test fallback.
+- DeepSeek cloud uses the direct OpenAI-compatible DeepSeek API only:
+  - `DEEPSEEK_API_KEY`
+  - `DEEPSEEK_MODEL=deepseek-chat`
+  - `DEEPSEEK_BASE_URL=https://api.deepseek.com`
+  - Do not use `/anthropic`.
+- Local Ollama keeps AI processing on the shop PC. DeepSeek sends minimal order context to cloud.
+- AI credentials, Telegram bot token, and Ollama calls must stay server-side.
+- AI draft generation should not send customer phone. Telegram internal alerts may include customer phone because they are shop-only urgent notifications.
+- Telegram is for internal shop alerts only while the Android app is not ready:
+  - `TELEGRAM_ALERTS_ENABLED=true`
+  - `TELEGRAM_BOT_TOKEN`
+  - `TELEGRAM_CHAT_ID`
+- Every successful new order may trigger one Telegram urgent alert with order number, customer name, phone/WhatsApp, item summary, quote status, delivery method/note, totals or pending confirmation, and admin order link.
+- Telegram failures must never block checkout or order creation.
+- AI output remains draft-only: never auto-send WhatsApp, never auto-mark payment, never auto-confirm delivery fee, and never auto-confirm pickup or delivery timing.

@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { formatMoney } from "./money";
 
 export type AiDraftKind = "whatsapp" | "summary" | "quote";
-type AiProvider = "openai" | "deepseek" | "deepseek-anthropic";
+type AiProvider = "ollama" | "deepseek";
 
 type AiOrder = {
   orderNumber: string;
@@ -57,7 +57,7 @@ function minimalOrderContext(order: AiOrder) {
     deliveryMethod: order.deliveryMethod,
     deliveryNote: order.deliveryNote || "none",
     subtotal: formatMoney(order.subtotalCents),
-    gst9Percent: formatMoney(order.gstCents),
+    gst: formatMoney(order.gstCents),
     deliveryFee: describeMoney(order.deliveryFeeCents),
     finalTotal: describeMoney(order.finalTotalCents),
     hasQuoteItems: order.hasQuoteItems,
@@ -87,7 +87,7 @@ function minimalOrderContext(order: AiOrder) {
 function instructionsFor(kind: AiDraftKind) {
   const task =
     kind === "whatsapp"
-      ? "Write a concise Chinese WhatsApp follow-up draft for the customer. Mention the order number, confirmation status, GST 9%, delivery fee or pickup arrangement needing shop confirmation, and PayNow UEN 25339900M only after confirmation. Do not include the customer's phone number."
+      ? "Write a concise Chinese WhatsApp follow-up draft for the customer. Mention the order number, confirmation status, GST, delivery fee or pickup arrangement needing shop confirmation, and PayNow UEN 25339900M only after confirmation. Do not include the customer's phone number."
       : kind === "summary"
         ? "Write a concise internal Chinese order summary for the shop owner. Use bullets. Highlight quote items, delivery/payment follow-up, and any customer note."
         : "Write a concise Chinese custom blend quote or supplier inquiry draft for shop staff. Include vendor code/name if present, blend details, quantity, deposit/balance if available, and what still needs manual confirmation.";
@@ -96,7 +96,8 @@ function instructionsFor(kind: AiDraftKind) {
     "You are the Hermes assistant for 福安 / FOOK ON in Singapore. BEAUTY BOAT 美人舟 is the brand; 福安 / FOOK ON is the company.",
     "Brand rules: the brand must be 美人舟 or BEAUTY BOAT only, and the company must be 福安 or FOOK ON. Never write 美人丹, 美人洲, or 源记.",
     "Tone: polite, clear, practical, like a Singapore local provision shop following up with a customer or supplier.",
-    "Operational rules: GST is 9%. Delivery fee is quoted separately for Lalamove/Grab. Self pickup timing still needs shop confirmation. PayNow payment is manually verified by the shop. Do not claim payment is confirmed unless the order context says so.",
+    "Operational rules: GST may be 0% or 9% according to the order. Delivery fee is quoted separately for Lalamove/Grab. Self pickup timing still needs shop confirmation. PayNow payment is manually verified by the shop. Do not claim payment is confirmed unless the order context says so.",
+    "AI output is draft-only. Never auto-send WhatsApp, never auto-mark payment, never auto-confirm delivery fees, and never auto-confirm pickup or delivery timing.",
     "Output only the draft text. No markdown table.",
     task,
   ].join("\n");
@@ -111,38 +112,52 @@ function safeOutput(text: string) {
 }
 
 function aiProvider(): AiProvider {
-  const provider = (process.env.AI_PROVIDER || "openai").toLowerCase();
-  if (provider === "openai" || provider === "deepseek" || provider === "deepseek-anthropic") {
+  const provider = (process.env.AI_PROVIDER || "ollama").toLowerCase();
+  if (provider === "ollama" || provider === "deepseek") {
     return provider;
   }
-  throw new Error(`Unsupported AI_PROVIDER: ${provider}`);
+  throw new Error(`Unsupported AI_PROVIDER: ${provider}. Use "ollama" or "deepseek".`);
 }
 
-async function generateWithOpenAI(kind: AiDraftKind, order: AiOrder) {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.AI_API_KEY;
-  if (!apiKey) {
-    throw new Error("OPENAI_API_KEY or AI_API_KEY is not configured");
-  }
-
-  const client = new OpenAI({ apiKey });
-  const response = await client.responses.create({
-    model: process.env.OPENAI_MODEL || process.env.AI_MODEL || "gpt-4.1-mini",
-    instructions: instructionsFor(kind),
-    input: JSON.stringify({
-      task: kindLabels[kind],
-      order: minimalOrderContext(order),
+async function generateWithOllama(kind: AiDraftKind, order: AiOrder) {
+  const baseUrl = (process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
+  const model = process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:14b";
+  const response = await fetch(`${baseUrl}/api/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model,
+      stream: false,
+      messages: [
+        { role: "system", content: instructionsFor(kind) },
+        {
+          role: "user",
+          content: JSON.stringify({
+            task: kindLabels[kind],
+            order: minimalOrderContext(order),
+          }),
+        },
+      ],
+      options: { temperature: 0.3 },
     }),
   });
 
-  if (!response.output_text) {
-    throw new Error("OpenAI response did not include output_text");
+  if (!response.ok) {
+    const details = await response.text();
+    throw new Error(`Ollama request failed: ${response.status} ${details.slice(0, 240)}`);
   }
 
-  return safeOutput(response.output_text);
+  const data = (await response.json()) as { message?: { content?: string } };
+  const text = data.message?.content;
+  if (!text) {
+    throw new Error("Ollama response did not include message content");
+  }
+
+  return safeOutput(text);
 }
 
 async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
-  const apiKey = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY;
   if (!apiKey) {
     throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
   }
@@ -173,54 +188,8 @@ async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
   return safeOutput(text);
 }
 
-async function generateWithDeepSeekAnthropic(kind: AiDraftKind, order: AiOrder) {
-  const apiKey = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY;
-  if (!apiKey) {
-    throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
-  }
-
-  const baseUrl = (process.env.DEEPSEEK_ANTHROPIC_BASE_URL || "https://api.deepseek.com/anthropic")
-    .replace(/\/$/, "");
-  const response = await fetch(`${baseUrl}/v1/messages`, {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({
-      model: process.env.DEEPSEEK_ANTHROPIC_MODEL || process.env.DEEPSEEK_MODEL || process.env.AI_MODEL || "deepseek-chat",
-      max_tokens: 900,
-      system: instructionsFor(kind),
-      messages: [
-        {
-          role: "user",
-          content: JSON.stringify({
-            task: kindLabels[kind],
-            order: minimalOrderContext(order),
-          }),
-        },
-      ],
-    }),
-  });
-
-  if (!response.ok) {
-    const details = await response.text();
-    throw new Error(`DeepSeek Anthropic request failed: ${response.status} ${details.slice(0, 240)}`);
-  }
-
-  const data = (await response.json()) as { content?: { type?: string; text?: string }[] };
-  const text = data.content?.find((block) => block.type === "text" && block.text)?.text;
-  if (!text) {
-    throw new Error("DeepSeek Anthropic response did not include text content");
-  }
-
-  return safeOutput(text);
-}
-
 export async function generateOrderAiDraft(kind: AiDraftKind, order: AiOrder) {
   const provider = aiProvider();
-  if (provider === "deepseek-anthropic") return generateWithDeepSeekAnthropic(kind, order);
   if (provider === "deepseek") return generateWithDeepSeek(kind, order);
-  return generateWithOpenAI(kind, order);
+  return generateWithOllama(kind, order);
 }

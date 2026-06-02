@@ -114,6 +114,8 @@ export default function AdminOrderDetailPage() {
   const [aiText, setAiText] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [telegramStatus, setTelegramStatus] = useState("");
+  const [telegramLoading, setTelegramLoading] = useState(false);
 
   async function load() {
     const response = await fetch(`/api/admin/orders/${params.id}`);
@@ -281,6 +283,15 @@ export default function AdminOrderDetailPage() {
     }
 
     setAiText(data.text || "");
+  }
+
+  async function sendTelegramTest() {
+    setTelegramLoading(true);
+    setTelegramStatus("");
+    const response = await fetch("/api/admin/telegram/test", { method: "POST" });
+    const data = await response.json().catch(() => null);
+    setTelegramLoading(false);
+    setTelegramStatus(response.ok ? "Telegram test sent." : data?.error || "Telegram test failed.");
   }
 
   if (!order) return <main className="shop-page">Loading...</main>;
@@ -501,6 +512,10 @@ export default function AdminOrderDetailPage() {
         <div className="summary-box ai-panel">
           <h2>Hermes AI 辅助</h2>
           <p>AI 只生成草稿；请店家确认金额、运输费和付款状态后再发送。</p>
+          <button className="cart-link" type="button" onClick={sendTelegramTest} disabled={telegramLoading}>
+            {telegramLoading ? "Sending Telegram..." : "Send Telegram test"}
+          </button>
+          {telegramStatus && <p className={telegramStatus.includes("sent") ? "" : "form-error"}>{telegramStatus}</p>}
           <div className="ai-action-grid">
             {aiDraftKinds.map((draft) => (
               <button

@@ -35,7 +35,12 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unable to generate AI draft";
-    const status = message.includes("OPENAI_API_KEY") ? 503 : 502;
+    const status =
+      message.includes("not configured") ||
+      message.includes("Unsupported AI_PROVIDER") ||
+      message.includes("Ollama request failed")
+        ? 503
+        : 502;
     return NextResponse.json({ error: message }, { status });
   }
 }
