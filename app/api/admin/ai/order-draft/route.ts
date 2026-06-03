@@ -38,7 +38,8 @@ export async function POST(request: Request) {
     const status =
       message.includes("not configured") ||
       message.includes("Unsupported AI_PROVIDER") ||
-      message.includes("Ollama request failed")
+      message.includes("Ollama request failed") ||
+      message.includes("Ollama request timed out")
         ? 503
         : 502;
     return NextResponse.json({ error: message }, { status });

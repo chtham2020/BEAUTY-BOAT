@@ -4,6 +4,8 @@ import { formatMoney } from "./money";
 export type AiDraftKind = "whatsapp" | "summary" | "quote";
 type AiProvider = "ollama" | "deepseek";
 
+const AI_TIMEOUT_MS = Number(process.env.AI_TIMEOUT_MS || 20000);
+
 type AiOrder = {
   orderNumber: string;
   customerName: string;
@@ -111,6 +113,70 @@ function safeOutput(text: string) {
     .trim();
 }
 
+function itemLines(order: AiOrder) {
+  return order.items
+    .map((item) => {
+      const amount = item.lineTotalCents == null ? "待确认" : formatMoney(item.lineTotalCents);
+      const custom = item.vendorCode ? `，Vendor code: ${item.vendorCode}` : item.quoteOnly ? "，询价项目" : "";
+      return `- ${item.productNameZh} / ${item.productNameEn} x ${item.quantity}${item.unit}${custom}：${amount}`;
+    })
+    .join("\n");
+}
+
+function fallbackDraft(kind: AiDraftKind, order: AiOrder, reason: string) {
+  const total = order.finalTotalCents == null || order.hasQuoteItems ? "最终金额待店家确认" : formatMoney(order.finalTotalCents);
+  const delivery = order.deliveryMethod === "self-pickup" ? "自费领取 / Self pickup" : "Lalamove / Grab 配送";
+
+  if (kind === "whatsapp") {
+    return safeOutput([
+      `您好 ${order.customerName}，这里是福安，BEAUTY BOAT 美人舟品牌。`,
+      `我们已收到订单 ${order.orderNumber}。`,
+      "",
+      itemLines(order),
+      "",
+      `商品小计：${formatMoney(order.subtotalCents)}`,
+      `GST：${formatMoney(order.gstCents)}`,
+      `运输方式：${delivery}`,
+      `总额：${total}`,
+      "运输费、取货时间和 PayNow 付款会由店家确认后再通知。谢谢。",
+      "",
+      `[Hermes fallback draft: ${reason}]`,
+    ].join("\n"));
+  }
+
+  if (kind === "summary") {
+    return safeOutput([
+      `订单摘要：${order.orderNumber}`,
+      `客户：${order.customerName}`,
+      `状态：${order.status}`,
+      `运输：${delivery}`,
+      `备注：${order.customerNote || "无"}`,
+      "",
+      "商品：",
+      itemLines(order),
+      "",
+      `小计：${formatMoney(order.subtotalCents)}`,
+      `GST：${formatMoney(order.gstCents)}`,
+      `最终金额：${total}`,
+      order.hasQuoteItems ? "注意：此订单含询价/客制粉料，需人工确认最终金额。" : "注意：固定价格订单，仍需人工确认付款和交货安排。",
+      "",
+      `[Hermes fallback summary: ${reason}]`,
+    ].join("\n"));
+  }
+
+  return safeOutput([
+    `客制粉料报价/询价草稿：${order.orderNumber}`,
+    `客户：${order.customerName}`,
+    "",
+    itemLines(order),
+    "",
+    "请店家确认：材料价格、磨粉费、运输费、取货/送货时间、PayNow 付款状态。",
+    "AI 未能及时生成，因此先提供这份安全草稿供人工修改。",
+    "",
+    `[Hermes fallback quote: ${reason}]`,
+  ].join("\n"));
+}
+
 function aiProvider(): AiProvider {
   const provider = (process.env.AI_PROVIDER || "ollama").toLowerCase();
   if (provider === "ollama" || provider === "deepseek") {
@@ -122,8 +188,11 @@ function aiProvider(): AiProvider {
 async function generateWithOllama(kind: AiDraftKind, order: AiOrder) {
   const baseUrl = (process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
   const model = process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:14b";
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   const response = await fetch(`${baseUrl}/api/chat`, {
     method: "POST",
+    signal: controller.signal,
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       model,
@@ -138,9 +207,18 @@ async function generateWithOllama(kind: AiDraftKind, order: AiOrder) {
           }),
         },
       ],
-      options: { temperature: 0.3 },
+      options: {
+        temperature: 0.3,
+        num_ctx: 4096,
+        num_predict: kind === "summary" ? 500 : 420,
+      },
     }),
-  });
+  }).catch((error) => {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(`Ollama request timed out after ${AI_TIMEOUT_MS / 1000}s. Try OLLAMA_MODEL=qwen2.5:3b or use AI_PROVIDER=deepseek.`);
+    }
+    throw error;
+  }).finally(() => clearTimeout(timeout));
 
   if (!response.ok) {
     const details = await response.text();
@@ -157,7 +235,7 @@ async function generateWithOllama(kind: AiDraftKind, order: AiOrder) {
 }
 
 async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
-  const apiKey = process.env.DEEPSEEK_API_KEY || process.env.AI_API_KEY;
+  const apiKey = process.env.AI_API_KEY || process.env.DEEPSEEK_API_KEY;
   if (!apiKey) {
     throw new Error("DEEPSEEK_API_KEY or AI_API_KEY is not configured");
   }
@@ -165,6 +243,7 @@ async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
   const client = new OpenAI({
     apiKey,
     baseURL: process.env.DEEPSEEK_BASE_URL || "https://api.deepseek.com",
+    timeout: AI_TIMEOUT_MS,
   });
   const response = await client.chat.completions.create({
     model: process.env.DEEPSEEK_MODEL || process.env.AI_MODEL || "deepseek-chat",
@@ -190,6 +269,14 @@ async function generateWithDeepSeek(kind: AiDraftKind, order: AiOrder) {
 
 export async function generateOrderAiDraft(kind: AiDraftKind, order: AiOrder) {
   const provider = aiProvider();
-  if (provider === "deepseek") return generateWithDeepSeek(kind, order);
-  return generateWithOllama(kind, order);
+  try {
+    if (provider === "deepseek") return generateWithDeepSeek(kind, order);
+    return generateWithOllama(kind, order);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "AI generation failed";
+    if (provider === "ollama" && process.env.AI_FALLBACK_DRAFTS !== "false") {
+      return fallbackDraft(kind, order, message);
+    }
+    throw error;
+  }
 }

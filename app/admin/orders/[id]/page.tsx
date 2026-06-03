@@ -68,6 +68,14 @@ type CustomBlendDraft = {
   grindingCostPerJin: string;
 };
 
+type AiProviderInfo = {
+  provider: "ollama" | "deepseek";
+  ollamaModel: string;
+  deepseekModel: string;
+  effectiveDeepSeekKey?: { length: number; ending: string } | null;
+  timeoutMs: number;
+};
+
 const statuses = ["pending", "quoted", "awaiting-payment", "paid", "processing", "completed", "cancelled"];
 const aiDraftKinds = [
   { kind: "whatsapp", label: "WhatsApp 草稿" },
@@ -98,6 +106,17 @@ function makeIngredientDraftLines(item: OrderDetail["items"][number]): Ingredien
     }));
 }
 
+function hasReceivedPayment(status: string) {
+  return ["paid", "processing", "completed"].includes(status);
+}
+
+function followUpTextForStatus(order: OrderDetail) {
+  if (!hasReceivedPayment(order.status)) return order.followUpText;
+  const paidMessage = "付款已經收到。谢谢";
+  if (order.followUpText.includes(paidMessage)) return order.followUpText;
+  return `${order.followUpText}\n${paidMessage}`;
+}
+
 export default function AdminOrderDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -114,6 +133,9 @@ export default function AdminOrderDetailPage() {
   const [aiText, setAiText] = useState("");
   const [aiError, setAiError] = useState("");
   const [aiLoading, setAiLoading] = useState<string | null>(null);
+  const [aiProvider, setAiProvider] = useState<AiProviderInfo | null>(null);
+  const [aiProviderLoading, setAiProviderLoading] = useState(false);
+  const [aiProviderStatus, setAiProviderStatus] = useState("");
   const [telegramStatus, setTelegramStatus] = useState("");
   const [telegramLoading, setTelegramLoading] = useState(false);
 
@@ -150,13 +172,20 @@ export default function AdminOrderDetailPage() {
     fetch("/api/admin/customers").then(async (response) => {
       if (response.ok) setCustomers(await response.json());
     });
+    fetch("/api/admin/ai/provider").then(async (response) => {
+      if (response.ok) setAiProvider(await response.json());
+    });
   }, []);
+
+  const displayFollowUpText = useMemo(() => {
+    return order ? followUpTextForStatus(order) : "";
+  }, [order]);
 
   const whatsappUrl = useMemo(() => {
     if (!order) return "#";
     const phone = order.customerPhone.replace(/\D/g, "");
-    return `https://wa.me/${phone}?text=${encodeURIComponent(order.followUpText)}`;
-  }, [order]);
+    return `https://wa.me/${phone}?text=${encodeURIComponent(displayFollowUpText)}`;
+  }, [order, displayFollowUpText]);
 
   async function update(data: Record<string, unknown>) {
     await fetch(`/api/admin/orders/${params.id}`, {
@@ -283,6 +312,28 @@ export default function AdminOrderDetailPage() {
     }
 
     setAiText(data.text || "");
+  }
+
+  async function switchAiProvider(provider: "ollama" | "deepseek") {
+    setAiProviderLoading(true);
+    setAiProviderStatus("");
+    setAiError("");
+    const response = await fetch("/api/admin/ai/provider", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider }),
+    });
+    const data = await response.json().catch(() => null);
+    setAiProviderLoading(false);
+
+    if (!response.ok) {
+      setAiProviderStatus(data?.error || "AI provider switch failed.");
+      return;
+    }
+
+    const next = await fetch("/api/admin/ai/provider");
+    if (next.ok) setAiProvider(await next.json());
+    setAiProviderStatus(provider === "deepseek" ? "AI switched to DeepSeek cloud." : "AI switched to local Ollama.");
   }
 
   async function sendTelegramTest() {
@@ -504,7 +555,7 @@ export default function AdminOrderDetailPage() {
 
         <div className="summary-box">
           <h2>WhatsApp 跟进</h2>
-          <textarea readOnly value={order.followUpText} rows={9} />
+          <textarea readOnly value={displayFollowUpText} rows={9} />
           <a className="checkout-button" href={whatsappUrl} target="_blank" rel="noreferrer">打开 WhatsApp</a>
           <a className="cart-link" href={`tel:${order.customerPhone}`}>电话联系</a>
         </div>
@@ -516,6 +567,45 @@ export default function AdminOrderDetailPage() {
             {telegramLoading ? "Sending Telegram..." : "Send Telegram test"}
           </button>
           {telegramStatus && <p className={telegramStatus.includes("sent") ? "" : "form-error"}>{telegramStatus}</p>}
+          <div className="summary-box">
+            <p>
+              <span>AI provider</span>
+              <strong>
+                {aiProvider
+                  ? `${aiProvider.provider} (${aiProvider.provider === "ollama" ? aiProvider.ollamaModel : aiProvider.deepseekModel})`
+                  : "Loading"}
+              </strong>
+            </p>
+            {aiProvider?.provider === "deepseek" && (
+              <p>
+                <span>DeepSeek key</span>
+                <strong>
+                  {aiProvider.effectiveDeepSeekKey
+                    ? `ending ${aiProvider.effectiveDeepSeekKey.ending}, length ${aiProvider.effectiveDeepSeekKey.length}`
+                    : "not configured"}
+                </strong>
+              </p>
+            )}
+            <div className="shop-actions">
+              <button
+                className="cart-link"
+                type="button"
+                onClick={() => switchAiProvider("deepseek")}
+                disabled={aiProviderLoading || aiProvider?.provider === "deepseek"}
+              >
+                Switch to DeepSeek
+              </button>
+              <button
+                className="cart-link"
+                type="button"
+                onClick={() => switchAiProvider("ollama")}
+                disabled={aiProviderLoading || aiProvider?.provider === "ollama"}
+              >
+                Switch to Ollama
+              </button>
+            </div>
+            {aiProviderStatus && <p className={aiProviderStatus.includes("failed") ? "form-error" : ""}>{aiProviderStatus}</p>}
+          </div>
           <div className="ai-action-grid">
             {aiDraftKinds.map((draft) => (
               <button
