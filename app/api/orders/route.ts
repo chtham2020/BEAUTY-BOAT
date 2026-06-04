@@ -10,7 +10,7 @@ import { formatIngredientLines } from "@/lib/custom-ingredients";
 import { makeFollowUpText, makeOrderNumber } from "@/lib/hermes";
 import { calculateGstWithRate } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
-import { sendTelegramOrderAlert } from "@/lib/telegram";
+import { sendTelegramManufacturingOrderAlert, sendTelegramOrderAlert } from "@/lib/telegram";
 import { getVendorQuoteFromDb } from "@/lib/vendor-quotes";
 import { z } from "zod";
 import { NextResponse } from "next/server";
@@ -275,6 +275,9 @@ export async function POST(request: Request) {
 
     sendTelegramOrderAlert(order).catch((telegramError) => {
       console.error("Telegram order alert failed", telegramError);
+    });
+    sendTelegramManufacturingOrderAlert(order).catch((telegramError) => {
+      console.error("Telegram manufacturing order alert failed", telegramError);
     });
 
     return NextResponse.json({ orderNumber: order.orderNumber });

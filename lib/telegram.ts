@@ -40,6 +40,15 @@ function telegramConfig() {
   return { botToken, chatId };
 }
 
+function telegramManufacturingConfig() {
+  const botToken = process.env.TELEGRAM_BOT_TOKEN;
+  const chatId = process.env.TELEGRAM_MANUFACTURING_CHAT_ID;
+  if (!botToken || !chatId) {
+    throw new Error("TELEGRAM_BOT_TOKEN and TELEGRAM_MANUFACTURING_CHAT_ID must be configured");
+  }
+  return { botToken, chatId };
+}
+
 function appUrl() {
   return (process.env.BEAUTY_BOAT_APP_URL || "").replace(/\/$/, "");
 }
@@ -58,6 +67,16 @@ function itemSummary(order: TelegramOrder) {
       const quoteLabel = item.quoteOnly || item.lineTotalCents == null ? "quote pending" : formatMoney(item.lineTotalCents);
       const custom = item.vendorCode ? ` | vendor code ${item.vendorCode}` : item.blendType ? ` | ${item.blendType}` : "";
       return `- ${item.productNameZh} / ${item.productNameEn} x ${item.quantity} ${item.unit}${custom}: ${quoteLabel}`;
+    })
+    .join("\n");
+}
+
+function manufacturingItemSummary(order: TelegramOrder) {
+  return order.items
+    .map((item) => {
+      const custom = item.vendorCode ? ` | vendor code ${item.vendorCode}` : item.blendType ? ` | ${item.blendType}` : "";
+      const quote = item.quoteOnly || item.lineTotalCents == null ? " | quote/price pending" : "";
+      return `- ${item.productNameZh} / ${item.productNameEn}: ${item.quantity} ${item.unit}${custom}${quote}`;
     })
     .join("\n");
 }
@@ -89,8 +108,28 @@ export function buildTelegramOrderAlert(order: TelegramOrder) {
     .join("\n");
 }
 
-export async function sendTelegramMessage(text: string) {
-  const { botToken, chatId } = telegramConfig();
+export function buildTelegramManufacturingOrderAlert(order: TelegramOrder) {
+  const adminLink = appUrl() ? `${appUrl()}/admin/orders/${order.id}` : "";
+  return [
+    "MANUFACTURING NEW ORDER - BEAUTY BOAT 美人舟 / FOOK ON 福安",
+    "",
+    `Order: ${order.orderNumber}`,
+    `Production status: ${order.hasQuoteItems ? "Quote/custom blend pending shop confirmation" : "Prepare/replenish stock if needed"}`,
+    `Delivery/pickup: ${deliveryLabel(order.deliveryMethod)}`,
+    `Delivery note: ${order.deliveryNote || "none"}`,
+    "",
+    "Items for production / stock:",
+    manufacturingItemSummary(order),
+    "",
+    `Customer note for production: ${order.customerNote || "none"}`,
+    `Payment/deposit: ${order.depositRequired ? "70% deposit applies after quote for new custom blend" : "Check admin before production if needed"}`,
+    adminLink ? `Admin: ${adminLink}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+async function sendTelegramMessageToChat(botToken: string, chatId: string, text: string) {
   const response = await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -107,9 +146,20 @@ export async function sendTelegramMessage(text: string) {
   }
 }
 
+export async function sendTelegramMessage(text: string) {
+  const { botToken, chatId } = telegramConfig();
+  await sendTelegramMessageToChat(botToken, chatId, text);
+}
+
 export async function sendTelegramOrderAlert(order: TelegramOrder) {
   if (!telegramEnabled()) return;
   await sendTelegramMessage(buildTelegramOrderAlert(order));
+}
+
+export async function sendTelegramManufacturingOrderAlert(order: TelegramOrder) {
+  if (!telegramEnabled()) return;
+  const { botToken, chatId } = telegramManufacturingConfig();
+  await sendTelegramMessageToChat(botToken, chatId, buildTelegramManufacturingOrderAlert(order));
 }
 
 export async function sendTelegramTestMessage() {
@@ -117,4 +167,16 @@ export async function sendTelegramTestMessage() {
     throw new Error("TELEGRAM_ALERTS_ENABLED is not true");
   }
   await sendTelegramMessage(`Telegram test from BEAUTY BOAT 美人舟 / FOOK ON 福安 at ${new Date().toISOString()}`);
+}
+
+export async function sendTelegramManufacturingTestMessage() {
+  if (!telegramEnabled()) {
+    throw new Error("TELEGRAM_ALERTS_ENABLED is not true");
+  }
+  const { botToken, chatId } = telegramManufacturingConfig();
+  await sendTelegramMessageToChat(
+    botToken,
+    chatId,
+    `Manufacturing Telegram test from BEAUTY BOAT 美人舟 / FOOK ON 福安 at ${new Date().toISOString()}`,
+  );
 }
