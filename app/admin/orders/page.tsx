@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -55,6 +56,7 @@ export default function AdminOrdersPage() {
           <h1>订单管理</h1>
         </div>
         <div className="shop-actions">
+          <AdminLogoutButton />
           <Link className="cart-link" href="/admin/customers">客户资料</Link>
           <Link className="cart-link" href="/admin/products">产品库存</Link>
         </div>

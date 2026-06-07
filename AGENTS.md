@@ -71,8 +71,8 @@
 - `openai` and `deepseek-anthropic` are no longer valid Hermes provider choices; unsupported providers should return a clear admin error.
 - Local Qwen uses Ollama from the server side only:
   - `OLLAMA_BASE_URL=http://127.0.0.1:11434`
-  - `OLLAMA_MODEL=qwen2.5:14b`
-  - `qwen2.5:3b` may be used as a faster local test fallback.
+  - `OLLAMA_MODEL=qwen2.5:3b` is the daily low-latency default for Hermes admin drafts.
+  - `qwen2.5:14b` may be used for higher-quality local testing, but it can be too slow on CPU-only machines.
 - DeepSeek cloud uses the direct OpenAI-compatible DeepSeek API only:
   - `DEEPSEEK_API_KEY`
   - `DEEPSEEK_MODEL=deepseek-chat`

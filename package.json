@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "node scripts/run-next.mjs dev",
+    "open:web": "powershell -ExecutionPolicy Bypass -File scripts/open-beauty-boat.ps1",
     "build": "next build",
     "start": "node scripts/run-next.mjs start",
     "lint": "next lint",

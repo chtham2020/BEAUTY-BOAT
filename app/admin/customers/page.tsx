@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
 import { useLanguagePreference } from "@/lib/language";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -178,6 +179,7 @@ export default function AdminCustomersPage() {
           <p>{t.body}</p>
         </div>
         <div className="shop-actions">
+          <AdminLogoutButton />
           <button
             className="language-toggle admin-language-toggle"
             type="button"

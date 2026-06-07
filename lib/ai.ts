@@ -187,7 +187,7 @@ function aiProvider(): AiProvider {
 
 async function generateWithOllama(kind: AiDraftKind, order: AiOrder) {
   const baseUrl = (process.env.OLLAMA_BASE_URL || "http://127.0.0.1:11434").replace(/\/$/, "");
-  const model = process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:14b";
+  const model = process.env.OLLAMA_MODEL || process.env.AI_MODEL || "qwen2.5:3b";
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), AI_TIMEOUT_MS);
   const response = await fetch(`${baseUrl}/api/chat`, {
@@ -209,8 +209,8 @@ async function generateWithOllama(kind: AiDraftKind, order: AiOrder) {
       ],
       options: {
         temperature: 0.3,
-        num_ctx: 4096,
-        num_predict: kind === "summary" ? 500 : 420,
+        num_ctx: 2048,
+        num_predict: kind === "summary" ? 360 : 300,
       },
     }),
   }).catch((error) => {

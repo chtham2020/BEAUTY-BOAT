@@ -188,7 +188,29 @@ export async function POST(request: Request) {
       finalTotalCents,
     });
 
-    const order = await prisma.order.create({
+    const order = await prisma.$transaction(async (tx) => {
+      for (const line of lines) {
+        if (line.customQuote || line.customRecipe || line.product.quoteOnly || line.product.priceCents == null) {
+          continue;
+        }
+
+        const quantityToDecrement = Math.max(1, Math.ceil(line.quantity));
+        const stockUpdate = await tx.product.updateMany({
+          where: {
+            id: line.product.id,
+            stock: { gte: quantityToDecrement },
+          },
+          data: {
+            stock: { decrement: quantityToDecrement },
+          },
+        });
+
+        if (stockUpdate.count !== 1) {
+          throw new Error("INSUFFICIENT_STOCK");
+        }
+      }
+
+      return tx.order.create({
       data: {
         orderNumber,
         customerName: parsed.data.customerName,
@@ -270,7 +292,8 @@ export async function POST(request: Request) {
           }),
         },
       },
-      include: { items: true },
+        include: { items: true },
+      });
     });
 
     sendTelegramOrderAlert(order).catch((telegramError) => {

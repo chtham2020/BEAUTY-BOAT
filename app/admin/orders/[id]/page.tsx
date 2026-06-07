@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
 import { parseIngredientLines, type IngredientPriceLine } from "@/lib/custom-ingredients";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
@@ -363,6 +364,7 @@ export default function AdminOrderDetailPage() {
           <p>{order.customerName} · {order.customerPhone}</p>
         </div>
         <div className="shop-actions">
+          <AdminLogoutButton />
           <Link className="cart-link" href="/admin/customers">客户资料</Link>
           <Link className="cart-link" href="/admin/orders">返回订单</Link>
         </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
 import { formatMoney } from "@/lib/money";
 import type { PublicProduct } from "@/lib/types";
 import Link from "next/link";
@@ -31,10 +32,16 @@ const emptyForm: ProductForm = {
   active: true,
 };
 
+function stockValue(value: string | undefined, fallback: number) {
+  const parsed = Math.floor(Number(value ?? fallback));
+  return Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+}
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
+  const [stockDrafts, setStockDrafts] = useState<Record<string, string>>({});
 
   async function load() {
     const response = await fetch("/api/admin/products");
@@ -47,6 +54,10 @@ export default function AdminProductsPage() {
     setPriceDrafts(Object.fromEntries(data.map((product: PublicProduct) => [
       product.id,
       product.priceCents == null ? "" : String(product.priceCents / 100),
+    ])));
+    setStockDrafts(Object.fromEntries(data.map((product: PublicProduct) => [
+      product.id,
+      String(product.stock),
     ])));
   }
 
@@ -84,6 +95,19 @@ export default function AdminProductsPage() {
     load();
   }
 
+  async function deleteProduct(product: PublicProduct) {
+    const ok = window.confirm(`删除产品 ${product.nameZh}？只建议用于已经不再使用的产品。`);
+    if (!ok) return;
+
+    const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      window.alert(data?.error || "Product delete failed");
+      return;
+    }
+    load();
+  }
+
   return (
     <main className="shop-page">
       <header className="shop-header">
@@ -92,6 +116,7 @@ export default function AdminProductsPage() {
           <h1>产品与库存</h1>
         </div>
         <div className="shop-actions">
+          <AdminLogoutButton />
           <Link className="cart-link" href="/admin/customers">客户资料</Link>
           <Link className="cart-link" href="/admin/orders">查看订单</Link>
         </div>
@@ -103,8 +128,8 @@ export default function AdminProductsPage() {
             <article className="admin-row" key={product.id}>
               <div>
                 <h2>{product.nameZh}</h2>
-                <p>{product.nameEn} · {product.unit}</p>
-                <p>{product.quoteOnly ? "询价" : formatMoney(product.priceCents)} · 库存 {product.stock}</p>
+                <p>{product.nameEn} - {product.unit}</p>
+                <p>{product.quoteOnly ? "询价" : formatMoney(product.priceCents)} - 库存 {product.stock}</p>
               </div>
               <label className="admin-price-control">
                 价格 SGD
@@ -128,11 +153,24 @@ export default function AdminProductsPage() {
               <button type="button" onClick={() => updateProduct(product, { active: !product.active })}>
                 {product.active ? "下架" : "上架"}
               </button>
-              <button type="button" onClick={() => updateProduct(product, { stock: product.stock + 1 })}>
-                +库存
+              <label className="admin-price-control">
+                库存
+                <input
+                  type="number"
+                  min="0"
+                  step="1"
+                  value={stockDrafts[product.id] ?? String(product.stock)}
+                  onChange={(event) => setStockDrafts({ ...stockDrafts, [product.id]: event.target.value })}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => updateProduct(product, { stock: stockValue(stockDrafts[product.id], product.stock) })}
+              >
+                保存库存
               </button>
-              <button type="button" onClick={() => updateProduct(product, { stock: Math.max(0, product.stock - 1) })}>
-                -库存
+              <button className="danger-button" type="button" onClick={() => deleteProduct(product)}>
+                删除产品
               </button>
             </article>
           ))}

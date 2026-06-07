@@ -25,10 +25,6 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
   const current = await prisma.product.findUnique({ where: { id } });
   if (!current) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  if (parsed.data.stock !== undefined && Math.abs(parsed.data.stock - current.stock) !== 1) {
-    return NextResponse.json({ error: "Stock can only be increased or decreased by one" }, { status: 409 });
-  }
-
   const product = await prisma.product.update({
     where: { id },
     data: parsed.data,
