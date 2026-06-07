@@ -1,6 +1,7 @@
 "use client";
 
 import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
+import { useLanguagePreference } from "@/lib/language";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
 import { useEffect, useState } from "react";
@@ -21,6 +22,10 @@ type AdminOrder = {
 };
 
 export default function AdminOrdersPage() {
+  const { language } = useLanguagePreference();
+  const navCopy = language === "zh"
+    ? { customers: "客户资料", products: "产品库存" }
+    : { customers: "Customers", products: "Products & Stock" };
   const [orders, setOrders] = useState<AdminOrder[]>([]);
 
   async function load() {
@@ -57,8 +62,8 @@ export default function AdminOrdersPage() {
         </div>
         <div className="shop-actions">
           <AdminLogoutButton />
-          <Link className="cart-link" href="/admin/customers">客户资料</Link>
-          <Link className="cart-link" href="/admin/products">产品库存</Link>
+          <Link className="cart-link" href="/admin/customers">{navCopy.customers}</Link>
+          <Link className="cart-link" href="/admin/products">{navCopy.products}</Link>
         </div>
       </header>
 

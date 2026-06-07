@@ -2,6 +2,7 @@
 
 import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
 import { parseIngredientLines, type IngredientPriceLine } from "@/lib/custom-ingredients";
+import { useLanguagePreference } from "@/lib/language";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -119,6 +120,10 @@ function followUpTextForStatus(order: OrderDetail) {
 }
 
 export default function AdminOrderDetailPage() {
+  const { language } = useLanguagePreference();
+  const navCopy = language === "zh"
+    ? { customers: "客户资料", orders: "返回订单" }
+    : { customers: "Customers", orders: "Back to Orders" };
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -365,8 +370,8 @@ export default function AdminOrderDetailPage() {
         </div>
         <div className="shop-actions">
           <AdminLogoutButton />
-          <Link className="cart-link" href="/admin/customers">客户资料</Link>
-          <Link className="cart-link" href="/admin/orders">返回订单</Link>
+          <Link className="cart-link" href="/admin/customers">{navCopy.customers}</Link>
+          <Link className="cart-link" href="/admin/orders">{navCopy.orders}</Link>
         </div>
       </header>
 

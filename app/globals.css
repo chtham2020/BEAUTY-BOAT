@@ -1146,6 +1146,26 @@ footer p {
   color: #a41f12;
 }
 
+.admin-row button.compact-icon-button {
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  height: 32px;
+  border-radius: 6px;
+  padding: 0;
+}
+
+.admin-row:has(.product-delete-button) {
+  position: relative;
+  padding-right: 56px;
+}
+
+.admin-row button.product-delete-button {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
 .admin-price-control {
   display: grid;
   gap: 6px;

@@ -1,8 +1,10 @@
 "use client";
 
 import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
+import { useLanguagePreference } from "@/lib/language";
 import { formatMoney } from "@/lib/money";
 import type { PublicProduct } from "@/lib/types";
+import { X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
@@ -38,6 +40,10 @@ function stockValue(value: string | undefined, fallback: number) {
 }
 
 export default function AdminProductsPage() {
+  const { language } = useLanguagePreference();
+  const navCopy = language === "zh"
+    ? { customers: "客户资料", orders: "查看订单", delete: "删除产品", confirmDelete: "只建议删除已经不再使用的产品。" }
+    : { customers: "Customers", orders: "View Orders", delete: "Delete product", confirmDelete: "Only delete products that are no longer used." };
   const [products, setProducts] = useState<PublicProduct[]>([]);
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [priceDrafts, setPriceDrafts] = useState<Record<string, string>>({});
@@ -96,7 +102,7 @@ export default function AdminProductsPage() {
   }
 
   async function deleteProduct(product: PublicProduct) {
-    const ok = window.confirm(`删除产品 ${product.nameZh}？只建议用于已经不再使用的产品。`);
+    const ok = window.confirm(`${navCopy.delete}: ${product.nameZh}?\n${navCopy.confirmDelete}`);
     if (!ok) return;
 
     const response = await fetch(`/api/admin/products/${product.id}`, { method: "DELETE" });
@@ -117,8 +123,8 @@ export default function AdminProductsPage() {
         </div>
         <div className="shop-actions">
           <AdminLogoutButton />
-          <Link className="cart-link" href="/admin/customers">客户资料</Link>
-          <Link className="cart-link" href="/admin/orders">查看订单</Link>
+          <Link className="cart-link" href="/admin/customers">{navCopy.customers}</Link>
+          <Link className="cart-link" href="/admin/orders">{navCopy.orders}</Link>
         </div>
       </header>
 
@@ -169,8 +175,14 @@ export default function AdminProductsPage() {
               >
                 保存库存
               </button>
-              <button className="danger-button" type="button" onClick={() => deleteProduct(product)}>
-                删除产品
+              <button
+                className="danger-button compact-icon-button product-delete-button"
+                type="button"
+                onClick={() => deleteProduct(product)}
+                aria-label={navCopy.delete}
+                title={navCopy.delete}
+              >
+                <X aria-hidden="true" size={16} />
               </button>
             </article>
           ))}
