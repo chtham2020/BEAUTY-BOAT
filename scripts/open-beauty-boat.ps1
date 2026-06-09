@@ -3,6 +3,14 @@ $ErrorActionPreference = "Stop"
 $ProjectRoot = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $StartPort = if ($env:BEAUTY_BOAT_OPEN_PORT) { [int]$env:BEAUTY_BOAT_OPEN_PORT } else { 3030 }
 $EndPort = $StartPort + 80
+$NextDir = Join-Path $ProjectRoot ".next"
+
+if (Test-Path -LiteralPath $NextDir) {
+  $ResolvedNextDir = (Resolve-Path -LiteralPath $NextDir).Path
+  if ($ResolvedNextDir -like "$ProjectRoot*") {
+    Remove-Item -LiteralPath $ResolvedNextDir -Recurse -Force
+  }
+}
 
 function Test-PortFree {
   param([int]$Port)

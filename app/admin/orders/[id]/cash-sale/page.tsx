@@ -14,6 +14,17 @@ function displayDate(date: Date) {
   }).format(date);
 }
 
+function displayInvoiceUnit(unit: string) {
+  const normalized = unit.trim().toLowerCase().replace(/\s+/g, "");
+  if (normalized === "1000g" || normalized === "1kg" || normalized === "kg" || normalized === "公斤") {
+    return "公斤 / Kg";
+  }
+  if (normalized === "斤") {
+    return "斤";
+  }
+  return unit;
+}
+
 function billToLines(order: NonNullable<Awaited<ReturnType<typeof getOrder>>>) {
   const customer = order.billToCustomer;
   if (customer) {
@@ -84,7 +95,7 @@ function renderInvoiceItemRows(item: NonNullable<Awaited<ReturnType<typeof getOr
         {item.blendType && <span>{item.blendType}</span>}
       </td>
       <td>{item.unitPriceCents == null ? "待确认" : formatMoney(item.unitPriceCents)}</td>
-      <td>斤</td>
+      <td>{displayInvoiceUnit(item.unit)}</td>
       <td />
       <td>{item.lineTotalCents == null ? "待确认" : formatMoney(item.lineTotalCents)}</td>
     </tr>
@@ -197,7 +208,7 @@ export default async function CashSalePage({ params }: { params: Promise<{ id: s
           </tfoot>
         </table>
 
-        <p className="invoice-note">注：净重单位「斤」按 1 斤 = 600g 记录。Quote-only items and delivery fees are confirmed manually by FOOK ON.</p>
+        <p className="invoice-note">注：客制粉料单位「斤」按 1 斤 = 600g 记录；标准商品依产品单位显示，包括公斤 / Kg。Quote-only items and delivery fees are confirmed manually by FOOK ON.</p>
 
         <footer className="invoice-footer">
           <div>
