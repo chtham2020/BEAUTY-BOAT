@@ -55,14 +55,18 @@ export type CustomRecipeSnapshot = {
   ingredientLines: {
     name: string;
     quantityJin: number;
+    quantity?: number;
+    unit?: "jin" | "g" | "kg";
   }[];
   ingredients: string[];
   ingredientQuantity: string;
   totalWeightJin: number;
+  totalWeightText?: string;
   unit: string;
   heatTreatment: string;
   processSpec: string;
   minimumQuantityJin: number;
+  noGrinding?: boolean;
   notes?: string;
 };
 

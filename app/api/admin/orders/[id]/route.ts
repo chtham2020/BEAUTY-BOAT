@@ -1,5 +1,6 @@
 import { requireAdmin } from "@/lib/auth";
 import { calculateBalanceCents, calculateDepositCents } from "@/lib/custom-pricing";
+import { makeFollowUpText } from "@/lib/hermes";
 import { prisma } from "@/lib/prisma";
 import { calculateGstWithRate } from "@/lib/money";
 import { NextResponse } from "next/server";
@@ -46,6 +47,17 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
       ? current.finalTotalCents
       : parsed.data.finalTotalCents ??
         (current.hasQuoteItems ? null : current.subtotalCents + gstCents + (deliveryFeeCents ?? 0));
+  const deliveryLabel = current.deliveryMethod === "self-pickup" ? "Self pickup" : "Lalamove / Grab delivery";
+  const followUpText = makeFollowUpText({
+    orderNumber: current.orderNumber,
+    customerName: current.customerName,
+    subtotalCents: current.subtotalCents,
+    gstCents,
+    gstRate,
+    hasQuoteItems: current.hasQuoteItems && finalTotalCents == null,
+    deliveryMethod: deliveryLabel,
+    finalTotalCents,
+  });
 
   const depositRequired = parsed.data.depositRequired ?? current.depositRequired;
   const order = await prisma.$transaction(async (tx) => {
@@ -57,6 +69,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
         gstCents,
         deliveryFeeCents,
         finalTotalCents,
+        followUpText,
         deliveryNote: parsed.data.deliveryNote,
         customerId: parsed.data.customerId,
         depositRequired,

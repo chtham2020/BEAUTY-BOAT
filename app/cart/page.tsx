@@ -113,6 +113,13 @@ function formatRepeatQuoteQuantity(quote: CustomQuotePublicSnapshot, quantity: n
   return language === "en" ? `${weightJin} jin total, 1 jin = 600g` : `${weightJin}斤（1斤 = 600g）`;
 }
 
+function formatRecipeLineQuantity(ingredient: { quantity?: number; unit?: string; quantityJin: number }) {
+  if (ingredient.quantity != null && ingredient.unit === "kg") return `${ingredient.quantity}kg`;
+  if (ingredient.quantity != null && ingredient.unit === "g") return `${ingredient.quantity}g`;
+  if (ingredient.quantity != null && ingredient.unit === "jin") return `${ingredient.quantity}斤`;
+  return `${ingredient.quantityJin}斤`;
+}
+
 export default function CartPage() {
   const { language } = useLanguagePreference();
   const [items, setItems] = useState<CartItem[]>([]);
@@ -236,7 +243,7 @@ export default function CartPage() {
                         {item.customRecipe.ingredientLines.map((ingredient, index) => (
                           <p key={`${ingredient.name}-${index}`}>
                             <span>{ingredient.name}</span>
-                            <b>{ingredient.quantityJin}斤</b>
+                            <b>{formatRecipeLineQuantity(ingredient)}</b>
                           </p>
                         ))}
                         <p className="ingredient-total-row">
@@ -245,7 +252,7 @@ export default function CartPage() {
                         </p>
                       </div>
                       <p><span>{t.price}</span><b>{t.recipePending}</b></p>
-                      <p><span>{t.deposit}</span><b>{t.recipePending}</b></p>
+                      {!item.customRecipe.noGrinding && <p><span>{t.deposit}</span><b>{t.recipePending}</b></p>}
                     </div>
                   )}
                 </div>

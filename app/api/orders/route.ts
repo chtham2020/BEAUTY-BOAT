@@ -24,14 +24,19 @@ const customRecipeSchema = z.object({
       z.object({
         name: z.string().min(1),
         quantityJin: z.number().min(0.01),
+        quantity: z.number().min(0.01).optional(),
+        unit: z.enum(["jin", "g", "kg"]).optional(),
       }),
     )
     .min(1),
   ingredients: z.array(z.string()).optional(),
+  ingredientQuantity: z.string().optional(),
   totalWeightJin: z.number().min(0.01),
+  totalWeightText: z.string().optional(),
   unit: z.string().default("斤"),
   heatTreatment: z.string().optional(),
   processSpec: z.string().optional(),
+  noGrinding: z.boolean().optional(),
   notes: z.string().optional(),
 });
 
@@ -47,7 +52,7 @@ const orderSchema = z.object({
     .array(
       z.object({
         productId: z.string().min(1),
-        quantity: z.number().min(0.5).max(999),
+        quantity: z.number().min(0.01).max(999),
         customQuote: z
           .object({
             vendorCode: z.string().min(1),
@@ -58,6 +63,29 @@ const orderSchema = z.object({
     )
     .min(1),
 });
+
+function formatRecipeQuantity(quantity: number | undefined, unit: string | undefined, fallbackJin: number) {
+  if (quantity != null && unit === "kg") return `${quantity}kg`;
+  if (quantity != null && unit === "g") return `${quantity}g`;
+  if (quantity != null && unit === "jin") return `${quantity}斤`;
+  return `${fallbackJin}斤`;
+}
+
+function formatRecipeIngredientText(recipe: z.infer<typeof customRecipeSchema>) {
+  if (recipe.noGrinding) {
+    return recipe.ingredientLines
+      .map((ingredient) => `${ingredient.name} ${formatRecipeQuantity(ingredient.quantity, ingredient.unit, ingredient.quantityJin)}`)
+      .join("; ");
+  }
+
+  return formatIngredientLines(
+    recipe.ingredientLines.map((ingredient) => ({
+      name: ingredient.name,
+      quantityJin: ingredient.quantityJin,
+      unitPriceCents: 0,
+    })),
+  );
+}
 
 function clean(value: string | undefined | null) {
   const trimmed = value?.trim();
@@ -146,7 +174,7 @@ export async function POST(request: Request) {
         }
         if (customRecipe) {
           const totalWeightJin = customRecipe.ingredientLines.reduce((sum, ingredient) => sum + ingredient.quantityJin, 0);
-          if (totalWeightJin < CUSTOM_BLEND_MINIMUM_JIN) {
+          if (!customRecipe.noGrinding && totalWeightJin < CUSTOM_BLEND_MINIMUM_JIN) {
             throw new Error("MINIMUM_QUANTITY");
           }
           if (Math.abs(totalWeightJin - customRecipe.totalWeightJin) > 0.001) {
@@ -171,7 +199,7 @@ export async function POST(request: Request) {
     const hasQuoteItems = lines.some(
       (line) => Boolean(line.customRecipe) || (!line.customQuote && (line.product.quoteOnly || line.product.priceCents == null)),
     );
-    const depositRequired = customRecipeItems.length > 0;
+    const depositRequired = customRecipeItems.some((item) => !item.customRecipe?.noGrinding);
     const gstCents = calculateGstWithRate(subtotalCents, parsed.data.gstRate);
     const finalTotalCents = hasQuoteItems ? null : subtotalCents + gstCents;
     const orderNumber = makeOrderNumber();
@@ -247,13 +275,7 @@ export async function POST(request: Request) {
               vendorName: line.customQuote?.vendorName ?? line.customRecipe?.vendorName ?? "New customer recipe",
               blendType: line.customQuote?.blendType ?? line.customRecipe?.blendType ?? "First-time custom blend",
               ingredients: line.customRecipe
-                ? formatIngredientLines(
-                    line.customRecipe.ingredientLines.map((ingredient) => ({
-                      name: ingredient.name,
-                      quantityJin: ingredient.quantityJin,
-                      unitPriceCents: 0,
-                    })),
-                  )
+                ? formatRecipeIngredientText(line.customRecipe)
                 : line.customQuote?.ingredientLines
                   ? formatIngredientLines(
                       line.customQuote.ingredientLines.map((ingredient) => ({
@@ -266,7 +288,9 @@ export async function POST(request: Request) {
               ingredientQuantity: line.customQuote
                 ? `${getCustomBlendWeightJin(line.quantity, line.customQuote)}斤 total, 1斤 = 600g`
                 : line.customRecipe
-                  ? `${line.customRecipe.totalWeightJin}斤 total, 1斤 = 600g`
+                  ? line.customRecipe.noGrinding
+                    ? (line.customRecipe.totalWeightText ?? line.customRecipe.ingredientQuantity)
+                    : `${line.customRecipe.totalWeightJin}斤 total, 1斤 = 600g`
                   : undefined,
               heatTreatment: line.customQuote?.heatTreatment ?? line.customRecipe?.heatTreatment ?? "Shop to confirm",
               processSpec:

@@ -21,6 +21,7 @@ const CART_KEY = "beauty_boat_cart";
 type RecipeDraftLine = {
   name: string;
   quantityJin: string;
+  quantityUnit: "jin" | "g" | "kg";
 };
 
 type IngredientCatalogItem = {
@@ -54,6 +55,10 @@ const copy = {
     ingredientName: "材料名称",
     ingredientPlaceholder: "选择或输入材料",
     quantityJin: "数量（斤）",
+    quantityUnit: "单位",
+    grindMode: "需要研磨",
+    sampleMode: "不研磨 / 试样配方",
+    sampleHelp: "只提供配方给店家评估，可用 g 或 kg 填写材料数量；暂不受 10斤最低研磨量限制。",
     addRow: "新增一行",
     removeRow: "删除此行",
     recipeNote: "配方 / 包装备注",
@@ -97,6 +102,10 @@ const copy = {
     ingredientName: "Ingredient name",
     ingredientPlaceholder: "Select or type ingredient",
     quantityJin: "Quantity jin",
+    quantityUnit: "Unit",
+    grindMode: "Grinding order",
+    sampleMode: "Not to grind / recipe sample",
+    sampleHelp: "Recipe sample only. Use g or kg for ingredient quantities. No 10 jin minimum applies until grinding is requested.",
     addRow: "Add row",
     removeRow: "Remove row",
     recipeNote: "Recipe / packing notes",
@@ -145,24 +154,49 @@ function writeCart(items: CartStoredItem[]) {
   window.localStorage.setItem(CART_KEY, JSON.stringify(items));
 }
 
-function makeRecipeSnapshot(lines: RecipeDraftLine[], notes: string): CustomRecipeSnapshot {
+function toJin(quantity: number, unit: RecipeDraftLine["quantityUnit"]) {
+  if (unit === "kg") return quantity / 0.6;
+  if (unit === "g") return quantity / 600;
+  return quantity;
+}
+
+function formatRecipeQuantity(quantity: number, unit: RecipeDraftLine["quantityUnit"]) {
+  if (unit === "kg") return `${quantity}kg`;
+  if (unit === "g") return `${quantity}g`;
+  return `${quantity}斤`;
+}
+
+function makeRecipeSnapshot(lines: RecipeDraftLine[], notes: string, noGrinding: boolean): CustomRecipeSnapshot {
   const ingredientLines = lines
-    .map((line) => ({ name: line.name.trim(), quantityJin: Number(line.quantityJin) }))
+    .map((line) => {
+      const quantity = Number(line.quantityJin);
+      return {
+        name: line.name.trim(),
+        quantity,
+        unit: line.quantityUnit,
+        quantityJin: toJin(quantity, line.quantityUnit),
+      };
+    })
     .filter((line) => line.name && line.quantityJin > 0);
   const totalWeightJin = ingredientLines.reduce((sum, line) => sum + line.quantityJin, 0);
+  const ingredientQuantity = noGrinding
+    ? ingredientLines.map((line) => `${line.name} ${formatRecipeQuantity(line.quantity ?? line.quantityJin, line.unit ?? "jin")}`).join("; ")
+    : `${totalWeightJin}斤 total, 1斤 = 600g`;
   return {
     recipeId: `recipe-${Date.now()}`,
     customerType: "new",
     vendorName: "New customer recipe",
-    blendType: "First-time custom blend",
+    blendType: noGrinding ? "Recipe sample test - not to grind" : "First-time custom blend",
     ingredientLines,
     ingredients: ingredientLines.map((line) => line.name),
-    ingredientQuantity: `${totalWeightJin}斤 total, 1斤 = 600g`,
+    ingredientQuantity,
     totalWeightJin,
-    unit: "斤",
-    heatTreatment: "Shop to confirm",
-    processSpec: "Shop to confirm",
-    minimumQuantityJin: CUSTOM_BLEND_MINIMUM_JIN,
+    totalWeightText: noGrinding ? ingredientQuantity : undefined,
+    unit: noGrinding ? "recipe" : "斤",
+    heatTreatment: noGrinding ? "Not to grind" : "Shop to confirm",
+    processSpec: noGrinding ? "Recipe only / sample trial; no grinding requested" : "Shop to confirm",
+    minimumQuantityJin: noGrinding ? 0 : CUSTOM_BLEND_MINIMUM_JIN,
+    noGrinding,
     notes: notes.trim() || undefined,
   };
 }
@@ -184,16 +218,17 @@ export default function ProductsPage() {
   const [validatingCodes, setValidatingCodes] = useState<Record<string, boolean>>({});
   const [ingredientCatalog, setIngredientCatalog] = useState<IngredientCatalogItem[]>([]);
   const [customMode, setCustomMode] = useState<"repeat" | "new">("repeat");
+  const [recipeNoGrinding, setRecipeNoGrinding] = useState(false);
   const [recipeLines, setRecipeLines] = useState<RecipeDraftLine[]>([
-    { name: "", quantityJin: "" },
-    { name: "", quantityJin: "" },
-    { name: "", quantityJin: "" },
+    { name: "", quantityJin: "", quantityUnit: "jin" },
+    { name: "", quantityJin: "", quantityUnit: "jin" },
+    { name: "", quantityJin: "", quantityUnit: "jin" },
   ]);
   const [recipeNotes, setRecipeNotes] = useState("");
   const t = copy[language];
 
   const recipeWeightJin = useMemo(
-    () => recipeLines.reduce((sum, line) => sum + (Number(line.quantityJin) || 0), 0),
+    () => recipeLines.reduce((sum, line) => sum + toJin(Number(line.quantityJin) || 0, line.quantityUnit), 0),
     [recipeLines],
   );
 
@@ -256,8 +291,9 @@ export default function ProductsPage() {
   }
 
   function addNewRecipe(product: PublicProduct) {
-    const recipe = makeRecipeSnapshot(recipeLines, recipeNotes);
-    if (getCustomRecipeWeightJin(recipe) < CUSTOM_BLEND_MINIMUM_JIN) return;
+    const recipe = makeRecipeSnapshot(recipeLines, recipeNotes, recipeNoGrinding);
+    if (getCustomRecipeWeightJin(recipe) <= 0) return;
+    if (!recipe.noGrinding && getCustomRecipeWeightJin(recipe) < CUSTOM_BLEND_MINIMUM_JIN) return;
     writeCart([{ productId: product.id, quantity: recipe.totalWeightJin, customRecipe: recipe }]);
     refreshCartState();
   }
@@ -411,6 +447,15 @@ export default function ProductsPage() {
                     ) : (
                       <div className="recipe-builder">
                         <p>{t.newRecipeHelp}</p>
+                        <label className="check-line">
+                          <input
+                            type="checkbox"
+                            checked={recipeNoGrinding}
+                            onChange={(event) => setRecipeNoGrinding(event.target.checked)}
+                          />
+                          {recipeNoGrinding ? t.sampleMode : t.grindMode}
+                        </label>
+                        {recipeNoGrinding && <p className="form-hint">{t.sampleHelp}</p>}
                         <p className="form-hint">{t.exclusive}</p>
                         {recipeLines.map((line, index) => (
                           <div className="recipe-row" key={index}>
@@ -431,7 +476,7 @@ export default function ProductsPage() {
                               aria-label={t.quantityJin}
                               type="number"
                               min="0"
-                              step="0.5"
+                              step={line.quantityUnit === "g" ? "1" : "0.01"}
                               value={line.quantityJin}
                               onChange={(event) =>
                                 setRecipeLines((current) =>
@@ -440,8 +485,26 @@ export default function ProductsPage() {
                                   ),
                                 )
                               }
-                              placeholder={t.quantityJin}
+                              placeholder={recipeNoGrinding ? t.quantityUnit : t.quantityJin}
                             />
+                            <select
+                              aria-label={t.quantityUnit}
+                              value={recipeNoGrinding ? line.quantityUnit : "jin"}
+                              disabled={!recipeNoGrinding}
+                              onChange={(event) =>
+                                setRecipeLines((current) =>
+                                  current.map((entry, entryIndex) =>
+                                    entryIndex === index
+                                      ? { ...entry, quantityUnit: event.target.value as RecipeDraftLine["quantityUnit"] }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                            >
+                              <option value="jin">斤</option>
+                              <option value="g">g</option>
+                              <option value="kg">kg</option>
+                            </select>
                             <button
                               type="button"
                               className="icon-button"
@@ -464,7 +527,12 @@ export default function ProductsPage() {
                         <button
                           className="quote-check-button"
                           type="button"
-                          onClick={() => setRecipeLines((current) => [...current, { name: "", quantityJin: "" }])}
+                          onClick={() =>
+                            setRecipeLines((current) => [
+                              ...current,
+                              { name: "", quantityJin: "", quantityUnit: recipeNoGrinding ? "g" : "jin" },
+                            ])
+                          }
                         >
                           <Plus size={16} /> {t.addRow}
                         </button>
@@ -480,14 +548,14 @@ export default function ProductsPage() {
                         <div className="quote-panel">
                           <p><span>{t.totalWeight}</span><b>{recipeWeightJin}斤 / {(recipeWeightJin * 0.6).toFixed(1)}kg</b></p>
                           <p><span>{t.price}</span><b>{t.recipePending}</b></p>
-                          <p><span>{t.deposit}</span><b>{t.recipePending}</b></p>
-                          {recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN && <p className="form-error">{t.belowMinimum}</p>}
+                          {!recipeNoGrinding && <p><span>{t.deposit}</span><b>{t.recipePending}</b></p>}
+                          {!recipeNoGrinding && recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN && <p className="form-error">{t.belowMinimum}</p>}
                         </div>
                         <button
                           className="checkout-button"
                           type="button"
                           onClick={() => addNewRecipe(product)}
-                          disabled={recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN}
+                          disabled={recipeWeightJin <= 0 || (!recipeNoGrinding && recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN)}
                         >
                           {t.addToCart}
                         </button>

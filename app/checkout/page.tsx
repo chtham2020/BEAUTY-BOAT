@@ -3,7 +3,6 @@
 import {
   calculateBalanceCents,
   calculateDepositCents,
-  hasNewCustomRecipe,
 } from "@/lib/custom-pricing";
 import { useLanguagePreference } from "@/lib/language";
 import { formatMoney } from "@/lib/money";
@@ -58,6 +57,7 @@ const copy = {
     repeatCustomBlend: "重複客製粉料",
     newCustomBlend: "新客客製粉料",
     recipePending: "新客客製粉料待店家報價；確認報價後需付 70% 訂金。",
+    samplePending: "配方试样待店家确认；暂不研磨，不套用最低研磨量。",
     repeatPending: "重複客製粉料已驗證；配方和最終金額只保存在福安後台。",
     submitting: "提交中...",
     submit: "提交訂單",
@@ -87,6 +87,7 @@ const copy = {
     repeatCustomBlend: "Repeat Custom Blend",
     newCustomBlend: "New Custom Blend",
     recipePending: "New custom blend quotation pending. 70% deposit is required after quote confirmation.",
+    samplePending: "Recipe sample pending shop confirmation. No grinding and no minimum grinding quantity yet.",
     repeatPending: "Repeat custom blend verified. Formula and final amount stay in FOOK ON backend.",
     submitting: "Submitting...",
     submit: "Submit Order",
@@ -134,7 +135,8 @@ export default function CheckoutPage() {
       customSubtotal,
       deposit: customSubtotal > 0 ? calculateDepositCents(customSubtotal) : 0,
       balance: customSubtotal > 0 ? calculateBalanceCents(customSubtotal) : 0,
-      hasNewRecipe: hasNewCustomRecipe(cartItems),
+      hasNewRecipe: cartItems.some((item) => Boolean(item.customRecipe)),
+      hasDepositRecipe: cartItems.some((item) => Boolean(item.customRecipe && !item.customRecipe.noGrinding)),
       hasRepeatQuote: cartItems.some((item) => Boolean(item.customQuote)),
     };
   }, [cartItems]);
@@ -172,7 +174,7 @@ export default function CheckoutPage() {
         deliveryMethod: formData.get("deliveryMethod"),
         customerNote: formData.get("customerNote"),
         gstRate,
-        depositRequired: customTotals.hasNewRecipe,
+        depositRequired: customTotals.hasDepositRecipe,
         items,
       }),
     });
@@ -287,7 +289,7 @@ export default function CheckoutPage() {
           {customTotals.hasNewRecipe && (
             <p>
               <span>{t.newCustomBlend}</span>
-              <strong>{t.recipePending}</strong>
+              <strong>{customTotals.hasDepositRecipe ? t.recipePending : t.samplePending}</strong>
             </p>
           )}
           {customTotals.customSubtotal > 0 && (

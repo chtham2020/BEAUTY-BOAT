@@ -1322,7 +1322,7 @@ footer p {
 .admin-ingredient-header,
 .admin-ingredient-row {
   display: grid;
-  grid-template-columns: minmax(110px, 1fr) 82px 92px 110px;
+  grid-template-columns: minmax(110px, 1fr) 82px 76px 92px 110px;
   gap: 8px;
   align-items: center;
   min-width: 0;
@@ -1335,7 +1335,8 @@ footer p {
   font-weight: 800;
 }
 
-.admin-ingredient-row input {
+.admin-ingredient-row input,
+.admin-ingredient-row select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);

@@ -1,5 +1,5 @@
 import { getAdminSession } from "@/lib/auth";
-import { ingredientSubtotalCents, ingredientWeightTotalJin, parseIngredientLines } from "@/lib/custom-ingredients";
+import { displayIngredientQuantity, ingredientSubtotalCents, ingredientWeightTotalJin, parseIngredientLines } from "@/lib/custom-ingredients";
 import { formatMoney } from "@/lib/money";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
@@ -21,6 +21,9 @@ function displayInvoiceUnit(unit: string) {
   }
   if (normalized === "斤") {
     return "斤";
+  }
+  if (normalized === "recipe") {
+    return "Recipe";
   }
   return unit;
 }
@@ -57,6 +60,41 @@ async function getOrder(id: string) {
 
 function renderInvoiceItemRows(item: NonNullable<Awaited<ReturnType<typeof getOrder>>>["items"][number]) {
   const ingredientLines = parseIngredientLines(item.ingredients);
+  if (item.heatTreatment === "Not to grind" && ingredientLines.length > 0) {
+    return (
+      <>
+        {ingredientLines.map((ingredient, index) => (
+          <tr key={`${item.id}-${ingredient.name}-${index}`}>
+            <td>{displayIngredientQuantity(ingredient)}</td>
+            <td>{ingredient.name}</td>
+            <td>{formatMoney(ingredient.unitPriceCents)}</td>
+            <td>{ingredient.unit === "jin" ? "斤" : ingredient.unit}</td>
+            <td />
+            <td>{formatMoney(ingredient.lineTotalCents)}</td>
+          </tr>
+        ))}
+      </>
+    );
+  }
+
+  if (item.heatTreatment === "Not to grind") {
+    return (
+      <tr key={item.id}>
+        <td>{item.quantity}</td>
+        <td>
+          <strong>{item.productNameZh}</strong>
+          <span>{item.productNameEn}</span>
+          {item.blendType && <span>{item.blendType}</span>}
+          {item.ingredients && <span>{item.ingredients}</span>}
+        </td>
+        <td>{item.unitPriceCents == null ? "待确认" : formatMoney(item.unitPriceCents)}</td>
+        <td>{displayInvoiceUnit(item.unit)}</td>
+        <td />
+        <td>{item.lineTotalCents == null ? "待确认" : formatMoney(item.lineTotalCents)}</td>
+      </tr>
+    );
+  }
+
   if (ingredientLines.length > 0) {
     const totalWeightJin = ingredientWeightTotalJin(ingredientLines);
     const ingredientsSubtotal = ingredientSubtotalCents(ingredientLines);

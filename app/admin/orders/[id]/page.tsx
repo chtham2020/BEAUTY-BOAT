@@ -1,7 +1,7 @@
 "use client";
 
 import { AdminLogoutButton } from "@/app/admin/AdminLogoutButton";
-import { parseIngredientLines, type IngredientPriceLine } from "@/lib/custom-ingredients";
+import { parseIngredientLines, quantityToJin, type IngredientPriceLine } from "@/lib/custom-ingredients";
 import { useLanguagePreference } from "@/lib/language";
 import { formatMoney } from "@/lib/money";
 import Link from "next/link";
@@ -61,6 +61,8 @@ type CustomerSummary = {
 type IngredientDraftLine = {
   name: string;
   quantityJin: number;
+  quantity: string;
+  unit: "jin" | "g" | "kg";
   unitPrice: string;
   lineTotal: string;
 };
@@ -91,7 +93,11 @@ function makeIngredientDraftLines(item: OrderDetail["items"][number]): Ingredien
     return parsedLines.map((line: IngredientPriceLine) => ({
       name: line.name,
       quantityJin: line.quantityJin,
-      unitPrice: String(line.unitPriceCents / 100),
+      quantity: String(line.quantity ?? line.quantityJin),
+      unit: line.unit ?? "jin",
+      unitPrice: item.heatTreatment === "Not to grind" && line.quantityJin > 0
+        ? String((line.lineTotalCents / 100 / (line.quantityJin * 0.6)).toFixed(2))
+        : String(line.unitPriceCents / 100),
       lineTotal: String(line.lineTotalCents / 100),
     }));
   }
@@ -103,6 +109,8 @@ function makeIngredientDraftLines(item: OrderDetail["items"][number]): Ingredien
     .map((name) => ({
       name,
       quantityJin: 1,
+      quantity: "1",
+      unit: "jin" as const,
       unitPrice: "0",
       lineTotal: "0",
     }));
@@ -117,6 +125,19 @@ function followUpTextForStatus(order: OrderDetail) {
   const paidMessage = "付款已經收到。谢谢";
   if (order.followUpText.includes(paidMessage)) return order.followUpText;
   return `${order.followUpText}\n${paidMessage}`;
+}
+
+function adminItemTitle(item: OrderDetail["items"][number]) {
+  if (item.unit === "recipe" || item.heatTreatment === "Not to grind") {
+    return `${item.productNameZh} · Recipe sample`;
+  }
+  return `${item.productNameZh} x ${item.quantity}${item.vendorCode || item.ingredients ? ` ${item.unit}` : ""}`;
+}
+
+function customReferenceLabel(item: OrderDetail["items"][number]) {
+  const reference = item.vendorCode ?? "New customer recipe";
+  if (!item.vendorName || item.vendorName === reference) return reference;
+  return `${reference} · ${item.vendorName}`;
 }
 
 export default function AdminOrderDetailPage() {
@@ -216,19 +237,23 @@ export default function AdminOrderDetailPage() {
     window.alert(data?.error || "Order delete failed");
   }
 
-  function updateIngredientDraft(itemId: string, index: number, data: Partial<IngredientDraftLine>) {
+  function updateIngredientDraft(itemId: string, index: number, data: Partial<IngredientDraftLine>, priceUnit: "jin" | "kg" = "jin") {
     setCustomBlendDrafts((current) => {
       const draft = current[itemId];
       if (!draft) return current;
       const lines = draft.lines.map((line, lineIndex) => {
         if (lineIndex !== index) return line;
         const next = { ...line, ...data };
-        if (data.quantityJin !== undefined || data.unitPrice !== undefined) {
-          const amount = Number(next.quantityJin || 0) * Number(next.unitPrice || 0);
+        if (data.quantity !== undefined || data.unit !== undefined) {
+          next.quantityJin = quantityToJin(Number(next.quantity || 0), next.unit);
+        }
+        const pricingQuantity = priceUnit === "kg" ? Number(next.quantityJin || 0) * 0.6 : Number(next.quantityJin || 0);
+        if (data.quantityJin !== undefined || data.quantity !== undefined || data.unit !== undefined || data.unitPrice !== undefined) {
+          const amount = pricingQuantity * Number(next.unitPrice || 0);
           next.lineTotal = Number.isFinite(amount) ? amount.toFixed(2) : "0";
         }
-        if (data.lineTotal !== undefined && Number(next.quantityJin) > 0) {
-          const unitPrice = Number(next.lineTotal || 0) / Number(next.quantityJin);
+        if (data.lineTotal !== undefined && pricingQuantity > 0) {
+          const unitPrice = Number(next.lineTotal || 0) / pricingQuantity;
           next.unitPrice = Number.isFinite(unitPrice) ? unitPrice.toFixed(2) : "0";
         }
         return next;
@@ -245,7 +270,7 @@ export default function AdminOrderDetailPage() {
         ...current,
         [itemId]: {
           ...draft,
-          lines: [...draft.lines, { name: "", quantityJin: 1, unitPrice: "0", lineTotal: "0" }],
+          lines: [...draft.lines, { name: "", quantityJin: 1, quantity: "1", unit: "jin", unitPrice: "0", lineTotal: "0" }],
         },
       };
     });
@@ -262,6 +287,8 @@ export default function AdminOrderDetailPage() {
         ingredientLines: draft.lines.map((line) => ({
           name: line.name,
           quantityJin: Number(line.quantityJin),
+          quantity: Number(line.quantity || line.quantityJin),
+          unit: line.unit,
           unitPriceCents: Math.round(Number(line.unitPrice || 0) * 100),
           lineTotalCents: Math.round(Number(line.lineTotal || 0) * 100),
         })),
@@ -381,19 +408,20 @@ export default function AdminOrderDetailPage() {
           {order.items.map((item) => (
             <div className="admin-order-item" key={item.id}>
               <p>
-                <span>{item.productNameZh} x {item.quantity}{item.vendorCode || item.ingredients ? ` ${item.unit}` : ""}</span>
+                <span>{adminItemTitle(item)}</span>
                 <strong>{item.quoteOnly ? "询价" : formatMoney(item.lineTotalCents)}</strong>
               </p>
               {(item.vendorCode || item.ingredients) && (
                 <div className="custom-cart-details">
-                  <p><span>Vendor code</span><b>{item.vendorCode ?? "New customer recipe"} · {item.vendorName}</b></p>
+                  <p><span>{item.vendorCode ? "Vendor code" : "Recipe type"}</span><b>{customReferenceLabel(item)}</b></p>
                   <p><span>Blend type</span><b>{item.blendType}</b></p>
                   {customBlendDrafts[item.id] && (
                     <div className="admin-ingredient-editor">
                       <div className="admin-ingredient-header">
                         <span>Ingredient</span>
-                        <span>Qty 斤</span>
-                        <span>Unit $</span>
+                        <span>Qty</span>
+                        <span>Unit</span>
+                        <span>{item.heatTreatment === "Not to grind" ? "Unit $/kg" : "Unit $/斤"}</span>
                         <span>Line $</span>
                       </div>
                       {customBlendDrafts[item.id].lines.map((line, index) => {
@@ -401,57 +429,68 @@ export default function AdminOrderDetailPage() {
                           <div className="admin-ingredient-row" key={`${item.id}-${line.name}-${index}`}>
                             <input
                               value={line.name}
-                              onChange={(event) => updateIngredientDraft(item.id, index, { name: event.target.value })}
-                            />
-                            <input
-                              type="number"
-                              step="0.5"
-                              min="0"
-                              value={line.quantityJin}
-                              onChange={(event) => updateIngredientDraft(item.id, index, { quantityJin: Number(event.target.value) })}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { name: event.target.value }, item.heatTreatment === "Not to grind" ? "kg" : "jin")}
                             />
                             <input
                               type="number"
                               step="0.01"
                               min="0"
+                              value={line.quantity}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { quantity: event.target.value }, item.heatTreatment === "Not to grind" ? "kg" : "jin")}
+                            />
+                            <select
+                              value={line.unit}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { unit: event.target.value as "jin" | "g" | "kg" }, item.heatTreatment === "Not to grind" ? "kg" : "jin")}
+                              aria-label="Ingredient unit"
+                            >
+                              <option value="g">g</option>
+                              <option value="kg">kg</option>
+                              <option value="jin">斤</option>
+                            </select>
+                            <input
+                              type="number"
+                              step="0.01"
+                              min="0"
                               value={line.unitPrice}
-                              onChange={(event) => updateIngredientDraft(item.id, index, { unitPrice: event.target.value })}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { unitPrice: event.target.value }, item.heatTreatment === "Not to grind" ? "kg" : "jin")}
                             />
                             <input
                               type="number"
                               step="0.01"
                               min="0"
                               value={line.lineTotal}
-                              onChange={(event) => updateIngredientDraft(item.id, index, { lineTotal: event.target.value })}
+                              onChange={(event) => updateIngredientDraft(item.id, index, { lineTotal: event.target.value }, item.heatTreatment === "Not to grind" ? "kg" : "jin")}
                             />
                           </div>
                         );
                       })}
-                      <div className="admin-ingredient-row">
-                        <span>Grinding / 斤</span>
-                        <span>{customBlendDrafts[item.id].lines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0)}斤</span>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={customBlendDrafts[item.id].grindingCostPerJin}
-                          onChange={(event) =>
-                            setCustomBlendDrafts((current) => ({
-                              ...current,
-                              [item.id]: { ...current[item.id], grindingCostPerJin: event.target.value },
-                            }))
-                          }
-                        />
-                        <strong>
-                          {formatMoney(
-                            Math.round(
-                              customBlendDrafts[item.id].lines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0) *
-                                Number(customBlendDrafts[item.id].grindingCostPerJin || 0) *
-                                100,
-                            ),
-                          )}
-                        </strong>
-                      </div>
+                      {item.heatTreatment !== "Not to grind" && (
+                        <div className="admin-ingredient-row">
+                          <span>Grinding / 斤</span>
+                          <span>{customBlendDrafts[item.id].lines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0)}斤</span>
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            value={customBlendDrafts[item.id].grindingCostPerJin}
+                            onChange={(event) =>
+                              setCustomBlendDrafts((current) => ({
+                                ...current,
+                                [item.id]: { ...current[item.id], grindingCostPerJin: event.target.value },
+                              }))
+                            }
+                          />
+                          <strong>
+                            {formatMoney(
+                              Math.round(
+                                customBlendDrafts[item.id].lines.reduce((sum, line) => sum + Number(line.quantityJin || 0), 0) *
+                                  Number(customBlendDrafts[item.id].grindingCostPerJin || 0) *
+                                  100,
+                              ),
+                            )}
+                          </strong>
+                        </div>
+                      )}
                       <button className="checkout-button" type="button" onClick={() => saveCustomBlendItem(item.id)}>
                         Save ingredient prices
                       </button>
@@ -480,12 +519,19 @@ export default function AdminOrderDetailPage() {
                       </button>
                     </div>
                   )}
+                  {item.ingredients && item.heatTreatment === "Not to grind" && (
+                    <p><span>Recipe sample</span><b>{item.ingredients}</b></p>
+                  )}
                   <p><span>Total weight</span><b>{item.ingredientQuantity}</b></p>
                   <p><span>Heat treatment</span><b>{item.heatTreatment}</b></p>
                   <p><span>Baking / grinding</span><b>{item.processSpec}</b></p>
-                  <p><span>Grinding / 斤</span><b>{formatMoney(item.grindingCostPer600gCents)}</b></p>
-                  <p><span>{order.depositRequired ? "70% new customer deposit" : "Deposit waived for repeat order"}</span><b>{formatMoney(item.depositCents)}</b></p>
-                  <p><span>{order.depositRequired ? "30% collection balance" : "collection balance"}</span><b>{formatMoney(item.balanceCents)}</b></p>
+                  {item.heatTreatment !== "Not to grind" && (
+                    <>
+                      <p><span>Grinding / 斤</span><b>{formatMoney(item.grindingCostPer600gCents)}</b></p>
+                      <p><span>{order.depositRequired ? "70% new customer deposit" : "Deposit waived for repeat order"}</span><b>{formatMoney(item.depositCents)}</b></p>
+                      <p><span>{order.depositRequired ? "30% collection balance" : "collection balance"}</span><b>{formatMoney(item.balanceCents)}</b></p>
+                    </>
+                  )}
                 </div>
               )}
             </div>
