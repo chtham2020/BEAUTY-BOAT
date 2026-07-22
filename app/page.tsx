@@ -26,67 +26,67 @@ const business = {
 const copy = {
   zh: {
     nav: {
-      home: "主页",
+      home: "主頁",
       story: "品牌故事",
       products: "香料粉",
-      order: "订购",
-      cart: "购物车",
-      contact: "联系",
+      order: "訂購",
+      cart: "購物車",
+      contact: "聯絡",
     },
-    heroKicker: "福安传统香料",
-    heroTitle: "一味香气，留住老派好手艺。",
+    heroKicker: "福安傳統香料",
+    heroTitle: "一味香氣，留住老派好手藝。",
     heroBody:
-      "美人舟延续传统粉料的温厚香气，从五香粉、胡椒粉到各式客制配方，为家常料理、熟食档与餐饮厨房调出稳定而有层次的味道。",
-    heroCta: "询问客制粉料",
+      "美人舟延續傳統粉料的溫厚香氣，從五香粉、胡椒粉到各式客製配方，為家常料理、熟食檔與餐飲廚房調出穩定而有層次的味道。",
+    heroCta: "詢問客製粉料",
     paynowLabel: "PayNow UEN",
-    carouselLabel: "轮播图片",
+    carouselLabel: "輪播圖片",
     slides: [
       {
         title: "泛舟美人的品牌意象",
-        text: "以一幅明亮的古早画面作为记忆点，让香料的故事带一点诗意与现代感。",
+        text: "以一幅明亮的古早畫面作為記憶點，讓香料的故事帶一點詩意與現代感。",
       },
       {
-        title: "五香粉的细致平衡",
-        text: "辛、甘、暖、厚，在真实调配动作里呈现配方的层次与稳定。",
+        title: "五香粉的細緻平衡",
+        text: "辛、甘、暖、厚，在真實調配動作裡呈現配方的層次與穩定。",
       },
       {
-        title: "按用途调配",
-        text: "从腌料、汤底到干拌粉，按料理习惯与用量调出合用的客制粉料。",
+        title: "按用途調配",
+        text: "從醃料、湯底到乾拌粉，按料理習慣與用量調出合用的客製粉料。",
       },
     ],
-    storyEyebrow: "从一匙粉开始",
-    storyTitle: "传统不是怀旧摆设，而是每天都能用得上的味道。",
+    storyEyebrow: "從一匙粉開始",
+    storyTitle: "傳統不是懷舊擺設，而是每天都能用得上的味道。",
     storyBody:
-      "美人舟的方向很朴素：把香料磨得细、配得准、用得顺。香气要先打开，入口要干净，留香要有余地。无论是家庭厨房的小罐，还是熟食档反复使用的大包粉料，都以稳定、耐煮、好搭配为核心。",
+      "美人舟的方向很樸素：把香料磨得細、配得準、用得順。香氣要先打開，入口要乾淨，留香要有餘地。無論是家庭廚房的小罐，還是熟食檔反覆使用的大包粉料，都以穩定、耐煮、好搭配為核心。",
     productsEyebrow: "粉料系列",
-    productsTitle: "熟悉的香气，做得更细。",
+    productsTitle: "熟悉的香氣，做得更細。",
     products: [
       {
         name: "五香粉",
         english: "Five-Spice Powder",
-        desc: "适合卤、炸、腌、焖，香气完整不抢味。",
+        desc: "適合滷、炸、醃、燜，香氣完整不搶味。",
       },
       {
         name: "胡椒粉",
         english: "Pepper Powder",
-        desc: "辛香直接，适合汤品、肉类、熟食调味。",
+        desc: "辛香直接，適合湯品、肉類、熟食調味。",
       },
       {
-        name: "客制粉料",
+        name: "客製粉料",
         english: "Custom Blends",
-        desc: "按用途、口味和用量调配，适合餐饮与批量使用。",
+        desc: "按用途、口味和用量調配，適合餐飲與批量使用。",
       },
     ],
     customTitle: "需要自己的粉料比例？",
     customBody:
-      "告诉我们用途、口味方向和使用场景，福安可以协助讨论适合的粉料组合。",
-    orderCta: "前往订购",
-    contactTitle: "联系与付款",
+      "告訴我們用途、口味方向和使用場景，福安可以協助討論適合的粉料組合。",
+    orderCta: "前往訂購",
+    contactTitle: "聯絡與付款",
     addressLabel: "地址",
-    phoneLabel: "电话",
-    mapLabel: "店铺位置",
-    mapLink: "打开地图导航",
-    footer: "传统香料粉料 · 新加坡",
+    phoneLabel: "電話",
+    mapLabel: "店舖位置",
+    mapLink: "打開地圖導航",
+    footer: "傳統香料粉料 · 新加坡",
   },
   en: {
     nav: {
@@ -136,7 +136,7 @@ const copy = {
         desc: "Clean peppery lift for soups, meats, cooked foods, and everyday seasoning.",
       },
       {
-        name: "客制粉料",
+        name: "客製粉料",
         english: "Custom Blends",
         desc: "Made around usage, taste profile, and volume needs for food businesses and kitchens.",
       },
@@ -166,10 +166,7 @@ export default function Home() {
   const t = copy[language];
   const otherLanguage = language === "zh" ? "en" : "zh";
 
-  const slide = useMemo(
-    () => t.slides[activeSlide],
-    [activeSlide, t.slides],
-  );
+  const slide = useMemo(() => t.slides[activeSlide], [activeSlide, t.slides]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -185,7 +182,7 @@ export default function Home() {
 
   return (
     <main className="site-shell">
-      <a className="floating-cart" href="/cart" aria-label="Open cart">
+      <a className="floating-cart" href="/cart" aria-label={t.nav.cart}>
         {t.nav.cart}
       </a>
       <header className="topbar" aria-label="Primary navigation">
@@ -209,7 +206,7 @@ export default function Home() {
             className="language-toggle"
             type="button"
             onClick={() => setLanguage(otherLanguage)}
-            aria-label={language === "zh" ? "Switch to English" : "切换到中文"}
+            aria-label={language === "zh" ? "Switch to English" : "切換到中文"}
           >
             <span className={language === "zh" ? "is-active" : ""}>中文</span>
             <span className={language === "en" ? "is-active" : ""}>EN</span>

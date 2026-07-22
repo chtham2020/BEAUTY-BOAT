@@ -160,6 +160,15 @@ function toJin(quantity: number, unit: RecipeDraftLine["quantityUnit"]) {
   return quantity;
 }
 
+function cleanNumber(value: number, decimals = 3) {
+  const rounded = Number(value.toFixed(decimals));
+  return String(rounded);
+}
+
+function formatWeightPair(weightJin: number) {
+  return `${cleanNumber(weightJin)}斤 / ${cleanNumber(weightJin * 0.6, 2)}kg`;
+}
+
 function formatRecipeQuantity(quantity: number, unit: RecipeDraftLine["quantityUnit"]) {
   if (unit === "kg") return `${quantity}kg`;
   if (unit === "g") return `${quantity}g`;
@@ -546,7 +555,7 @@ export default function ProductsPage() {
                           />
                         </label>
                         <div className="quote-panel">
-                          <p><span>{t.totalWeight}</span><b>{recipeWeightJin}斤 / {(recipeWeightJin * 0.6).toFixed(1)}kg</b></p>
+                          <p><span>{t.totalWeight}</span><b>{formatWeightPair(recipeWeightJin)}</b></p>
                           <p><span>{t.price}</span><b>{t.recipePending}</b></p>
                           {!recipeNoGrinding && <p><span>{t.deposit}</span><b>{t.recipePending}</b></p>}
                           {!recipeNoGrinding && recipeWeightJin < CUSTOM_BLEND_MINIMUM_JIN && <p className="form-error">{t.belowMinimum}</p>}

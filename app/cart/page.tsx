@@ -108,9 +108,18 @@ function displayUnit(unit: string, language: "zh" | "en") {
   return unit;
 }
 
+function cleanNumber(value: number, decimals = 3) {
+  const rounded = Number(value.toFixed(decimals));
+  return String(rounded);
+}
+
+function formatWeightPair(weightJin: number) {
+  return `${cleanNumber(weightJin)}斤 / ${cleanNumber(weightJin * 0.6, 2)}kg`;
+}
 function formatRepeatQuoteQuantity(quote: CustomQuotePublicSnapshot, quantity: number, language: "zh" | "en") {
   const weightJin = getCustomBlendWeightJin(quantity, quote);
-  return language === "en" ? `${weightJin} jin total, 1 jin = 600g` : `${weightJin}斤（1斤 = 600g）`;
+  const cleanWeight = cleanNumber(weightJin);
+  return language === "en" ? `${cleanWeight} jin total, 1 jin = 600g` : `${cleanWeight}斤（1斤 = 600g）`;
 }
 
 function formatRecipeLineQuantity(ingredient: { quantity?: number; unit?: string; quantityJin: number }) {
@@ -248,7 +257,7 @@ export default function CartPage() {
                         ))}
                         <p className="ingredient-total-row">
                           <span>{t.totalWeight}</span>
-                          <b>{item.customRecipe.totalWeightJin}斤 / {(item.customRecipe.totalWeightJin * 0.6).toFixed(1)}kg</b>
+                          <b>{formatWeightPair(item.customRecipe.totalWeightJin)}</b>
                         </p>
                       </div>
                       <p><span>{t.price}</span><b>{t.recipePending}</b></p>
